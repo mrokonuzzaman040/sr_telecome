@@ -107,7 +107,7 @@ class _CustomerScreenState extends State<CustomerScreen> {
                           );
                         }
                       } catch (e) {
-                        if (ctx.mounted) {
+                        if (mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(content: Text('ত্রুটি: $e'), backgroundColor: AppTheme.danger),
                           );
