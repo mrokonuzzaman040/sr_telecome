@@ -218,14 +218,8 @@ class DashboardScreen extends StatelessWidget {
               sliver: SliverList(
                 delegate: SliverChildListDelegate([
                   SectionHeader(title: 'আজকের সারসংক্ষেপ'),
-                  GridView.count(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    crossAxisCount: 2,
-                    mainAxisSpacing: 10,
-                    crossAxisSpacing: 10,
-                    childAspectRatio: 1.5,
-                    children: [
+                  StatCardGrid(
+                    cards: [
                       StatCard(label: 'নগদ আদায়', value: '৳${currency.format(todayCashIn)}', icon: Icons.payments, color: AppTheme.success),
                       StatCard(label: 'আজকের খরচ', value: '৳${currency.format(todayExpenseTotal)}', icon: Icons.money_off, color: Colors.deepOrange),
                       StatCard(label: 'ক্যাশ ড্রয়ার (আনুমানিক)', value: '৳${currency.format(estimatedCashDrawer)}', icon: Icons.savings_outlined, color: Colors.indigo),
@@ -238,14 +232,8 @@ class DashboardScreen extends StatelessWidget {
                   const SizedBox(height: 24),
 
                   SectionHeader(title: 'হিসাব ও মজুদ'),
-                  GridView.count(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    crossAxisCount: 2,
-                    mainAxisSpacing: 10,
-                    crossAxisSpacing: 10,
-                    childAspectRatio: 1.5,
-                    children: [
+                  StatCardGrid(
+                    cards: [
                       StatCard(
                         label: 'মোট বকেয়া',
                         value: '৳${currency.format(totalDue)}',

@@ -41,89 +41,98 @@ class AppTheme {
     colors: [primary, Color(0xFF0D9488)],
   );
 
-  static ThemeData lightTheme = ThemeData(
-    useMaterial3: true,
-    colorScheme: ColorScheme.fromSeed(
-      seedColor: primary,
-      primary: primary,
-      secondary: secondary,
-      surface: cardLight,
-      brightness: Brightness.light,
-    ),
-    scaffoldBackgroundColor: backgroundLight,
-    textTheme: GoogleFonts.hindSiliguriTextTheme().apply(
-      bodyColor: textDark,
-      displayColor: textDark,
-    ),
-    appBarTheme: AppBarTheme(
-      backgroundColor: primary,
-      foregroundColor: Colors.white,
-      elevation: 0,
-      centerTitle: true,
-      titleTextStyle: GoogleFonts.hindSiliguri(
-        color: Colors.white,
-        fontSize: 18,
-        fontWeight: FontWeight.bold,
+  static ThemeData lightTheme = buildThemeWithColor(primary, primaryDark, primaryLight);
+
+  /// Build a ThemeData with a dynamic primary color. Used by ThemeProvider.
+  static ThemeData buildThemeWithColor(
+    Color primaryColor,
+    Color primaryDarkColor,
+    Color primaryLightColor,
+  ) {
+    return ThemeData(
+      useMaterial3: true,
+      colorScheme: ColorScheme.fromSeed(
+        seedColor: primaryColor,
+        primary: primaryColor,
+        secondary: secondary,
+        surface: cardLight,
+        brightness: Brightness.light,
       ),
-    ),
-    cardTheme: CardThemeData(
-      elevation: 0,
-      color: Colors.white,
-      surfaceTintColor: Colors.transparent,
-      margin: EdgeInsets.zero,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(radiusMd),
-        side: const BorderSide(color: border, width: 1),
+      scaffoldBackgroundColor: backgroundLight,
+      textTheme: GoogleFonts.hindSiliguriTextTheme().apply(
+        bodyColor: textDark,
+        displayColor: textDark,
       ),
-    ),
-    navigationBarTheme: NavigationBarThemeData(
-      backgroundColor: Colors.white,
-      indicatorColor: primary.withValues(alpha: 0.12),
-      elevation: 0,
-      height: 64,
-      labelTextStyle: WidgetStateProperty.resolveWith((states) {
-        final selected = states.contains(WidgetState.selected);
-        return GoogleFonts.hindSiliguri(
-          fontSize: 11,
-          fontWeight: selected ? FontWeight.bold : FontWeight.w500,
-          color: selected ? primary : textMuted,
-        );
-      }),
-      iconTheme: WidgetStateProperty.resolveWith((states) {
-        final selected = states.contains(WidgetState.selected);
-        return IconThemeData(color: selected ? primary : textMuted);
-      }),
-    ),
-    elevatedButtonTheme: ElevatedButtonThemeData(
-      style: ElevatedButton.styleFrom(
-        backgroundColor: primary,
+      appBarTheme: AppBarTheme(
+        backgroundColor: primaryColor,
         foregroundColor: Colors.white,
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
-        textStyle: GoogleFonts.hindSiliguri(
+        elevation: 0,
+        centerTitle: true,
+        titleTextStyle: GoogleFonts.hindSiliguri(
+          color: Colors.white,
+          fontSize: 18,
           fontWeight: FontWeight.bold,
-          fontSize: 15,
         ),
       ),
-    ),
-    inputDecorationTheme: InputDecorationTheme(
-      filled: true,
-      fillColor: Colors.white,
-      border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+      cardTheme: CardThemeData(
+        elevation: 0,
+        color: Colors.white,
+        surfaceTintColor: Colors.transparent,
+        margin: EdgeInsets.zero,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(radiusMd),
+          side: const BorderSide(color: border, width: 1),
+        ),
       ),
-      enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+      navigationBarTheme: NavigationBarThemeData(
+        backgroundColor: Colors.white,
+        indicatorColor: primaryColor.withValues(alpha: 0.12),
+        elevation: 0,
+        height: 64,
+        labelTextStyle: WidgetStateProperty.resolveWith((states) {
+          final selected = states.contains(WidgetState.selected);
+          return GoogleFonts.hindSiliguri(
+            fontSize: 11,
+            fontWeight: selected ? FontWeight.bold : FontWeight.w500,
+            color: selected ? primaryColor : textMuted,
+          );
+        }),
+        iconTheme: WidgetStateProperty.resolveWith((states) {
+          final selected = states.contains(WidgetState.selected);
+          return IconThemeData(color: selected ? primaryColor : textMuted);
+        }),
       ),
-      focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: primary, width: 2),
+      elevatedButtonTheme: ElevatedButtonThemeData(
+        style: ElevatedButton.styleFrom(
+          backgroundColor: primaryColor,
+          foregroundColor: Colors.white,
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          textStyle: GoogleFonts.hindSiliguri(
+            fontWeight: FontWeight.bold,
+            fontSize: 15,
+          ),
+        ),
       ),
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-    ),
-  );
+      inputDecorationTheme: InputDecorationTheme(
+        filled: true,
+        fillColor: Colors.white,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: primaryColor, width: 2),
+        ),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      ),
+    );
+  }
 }

@@ -19,6 +19,9 @@ import {
   VolumeX,
   Smartphone,
   Sparkles,
+  Fingerprint,
+  Palette,
+  Check,
 } from "lucide-react";
 
 export function SettingsView() {
@@ -553,6 +556,223 @@ export function SettingsView() {
               {isChangingCashierPin ? "Updating..." : "Update Cashier PIN"}
             </button>
           </form>
+        </div>
+      </div>
+
+      {/* Appearance: Fingerprint & Theme Color */}
+      <div className="bg-white rounded-lg border border-slate-200 shadow-2xs p-4 space-y-4">
+        <div className="border-b border-slate-200 pb-3">
+          <h3 className="font-bold text-xs uppercase tracking-wider text-slate-800 flex items-center gap-1.5">
+            <Palette className="w-4 h-4 text-violet-600" />
+            <span>Appearance &amp; Biometric (অ্যাপিয়ারেন্স ও বায়োমেট্রিক)</span>
+          </h3>
+          <p className="text-[11px] text-slate-500 mt-0.5">
+            অ্যাপের থিম রঙ পরিবর্তন করুন এবং ফিঙ্গারপ্রিন্ট লগইন চালু করুন
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+          {/* Fingerprint Toggle */}
+          <div className="p-3 rounded-lg border border-slate-200 bg-slate-50/60 flex items-start justify-between gap-3">
+            <div className="space-y-1">
+              <div className="flex items-center gap-1.5 font-bold text-slate-900">
+                <Fingerprint className="w-4 h-4 text-violet-600" />
+                <span>Fingerprint / Biometric Login</span>
+              </div>
+              <p className="text-[11px] text-slate-500">
+                পিনের পরিবর্তে ফিঙ্গারপ্রিন্ট বা ফেস আনলক দিয়ে অ্যাপে প্রবেশ করুন (মোবাইল অ্যাপে কার্যকর)।
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                const next = !form.fingerprintEnabled;
+                setForm((p) => ({ ...p, fingerprintEnabled: next }));
+                updateSettings({ ...form, fingerprintEnabled: next });
+              }}
+              className={`px-3 py-1 rounded-full font-bold text-[11px] transition shrink-0 cursor-pointer ${
+                form.fingerprintEnabled
+                  ? "bg-violet-600 text-white"
+                  : "bg-slate-200 text-slate-600 hover:bg-slate-300"
+              }`}
+            >
+              {form.fingerprintEnabled ? "চালু (ON)" : "বন্ধ (OFF)"}
+            </button>
+          </div>
+
+          {/* Current theme preview */}
+          <div className="p-3 rounded-lg border border-slate-200 bg-slate-50/60 space-y-2">
+            <div className="flex items-center gap-1.5 font-bold text-slate-900">
+              <Palette className="w-4 h-4 text-violet-600" />
+              <span>Theme Accent Color</span>
+            </div>
+            <p className="text-[11px] text-slate-500">
+              অ্যাপের প্রাথমিক রঙ নির্বাচন করুন। মোবাইল ও ওয়েব উভয়ে প্রযোজ্য।
+            </p>
+            <div className="flex items-center gap-2">
+              <div
+                className="w-7 h-7 rounded-full border-2 border-white shadow-sm"
+                style={{ backgroundColor: form.themeColor || "#0f766e" }}
+              />
+              <span className="font-mono text-[11px] text-slate-600 uppercase">
+                {form.themeColor || "#0f766e"}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* Theme Color Swatches */}
+        <div className="space-y-2">
+          <p className="text-[11px] font-semibold text-slate-600 uppercase tracking-wider">
+            Select Theme Color:
+          </p>
+          <div className="flex flex-wrap gap-3">
+            {[
+              { key: "teal",   label: "Teal",   color: "#0f766e" },
+              { key: "indigo", label: "Indigo", color: "#4338ca" },
+              { key: "blue",   label: "Blue",   color: "#1d4ed8" },
+              { key: "violet", label: "Violet", color: "#7c3aed" },
+              { key: "rose",   label: "Rose",   color: "#e11d48" },
+              { key: "orange", label: "Orange", color: "#ea580c" },
+              { key: "green",  label: "Green",  color: "#16a34a" },
+              { key: "slate",  label: "Slate",  color: "#334155" },
+            ].map((opt) => {
+              const isSelected = (form.themeColor || "#0f766e") === opt.color;
+              return (
+                <button
+                  key={opt.key}
+                  type="button"
+                  title={opt.label}
+                  onClick={() => {
+                    setForm((p) => ({ ...p, themeColor: opt.color }));
+                    updateSettings({ ...form, themeColor: opt.color });
+                  }}
+                  className="relative w-9 h-9 rounded-full border-2 transition-all cursor-pointer active:scale-95"
+                  style={{
+                    backgroundColor: opt.color,
+                    borderColor: isSelected ? "white" : "transparent",
+                    boxShadow: isSelected ? `0 0 0 3px ${opt.color}` : "none",
+                  }}
+                >
+                  {isSelected && (
+                    <Check className="w-4 h-4 text-white absolute inset-0 m-auto" />
+                  )}
+                </button>
+              );
+            })}
+          </div>
+          <p className="text-[10px] text-slate-400 mt-1">
+            থিম রঙ পরিবর্তন মোবাইল অ্যাপে তাৎক্ষণিক কার্যকর হয়। ওয়েবে পরবর্তী রিলিজে সম্পূর্ণ প্রয়োগ হবে।
+          </p>
+        </div>
+      </div>
+
+      {/* Appearance: Fingerprint & Theme Color */}
+      <div className="bg-white rounded-lg border border-slate-200 shadow-2xs p-4 space-y-4">
+        <div className="border-b border-slate-200 pb-3">
+          <h3 className="font-bold text-xs uppercase tracking-wider text-slate-800 flex items-center gap-1.5">
+            <Palette className="w-4 h-4 text-violet-600" />
+            <span>Appearance &amp; Biometric Login</span>
+          </h3>
+          <p className="text-[11px] text-slate-500 mt-0.5">
+            থিম রঙ ও ফিঙ্গারপ্রিন্ট লগইন বিকল্প সেটার করুন
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+          {/* Fingerprint Toggle */}
+          <div className="p-3 rounded-lg border border-slate-200 bg-slate-50/60 flex items-start justify-between gap-3">
+            <div className="space-y-1">
+              <div className="flex items-center gap-1.5 font-bold text-slate-900">
+                <Fingerprint className="w-4 h-4 text-violet-600" />
+                <span>Fingerprint / Biometric Login</span>
+              </div>
+              <p className="text-[11px] text-slate-500">
+                পিনের পরিবর্তে ফিঙ্গারপ্রিন্ট বা ফেস আনলক দিয়ে অ্যাপে প্রবেশ করুন (মোবাইল অ্যাপে কার্যকর)।
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                const next = !form.fingerprintEnabled;
+                setForm((p) => ({ ...p, fingerprintEnabled: next }));
+                updateSettings({ ...form, fingerprintEnabled: next });
+              }}
+              className={`px-3 py-1 rounded-full font-bold text-[11px] transition shrink-0 cursor-pointer ${
+                form.fingerprintEnabled
+                  ? "bg-violet-600 text-white"
+                  : "bg-slate-200 text-slate-600 hover:bg-slate-300"
+              }`}
+            >
+              {form.fingerprintEnabled ? "চালু (ON)" : "বন্ধ (OFF)"}
+            </button>
+          </div>
+
+          {/* Current theme preview */}
+          <div className="p-3 rounded-lg border border-slate-200 bg-slate-50/60 space-y-2">
+            <div className="flex items-center gap-1.5 font-bold text-slate-900">
+              <Palette className="w-4 h-4 text-violet-600" />
+              <span>Current Theme Color</span>
+            </div>
+            <div className="flex items-center gap-2 mt-1">
+              <div
+                className="w-7 h-7 rounded-full border-2 border-white shadow-sm shrink-0"
+                style={{ backgroundColor: form.themeColor || "#0f766e" }}
+              />
+              <span className="font-mono text-[11px] text-slate-600 uppercase">
+                {form.themeColor || "#0f766e"}
+              </span>
+            </div>
+            <p className="text-[11px] text-slate-500">
+              মোবাইল অ্যাপে থিম রঙ তাৎক্ষণিক প্রয়োগ হয়।
+            </p>
+          </div>
+        </div>
+
+        {/* Theme Color Swatches */}
+        <div className="space-y-2">
+          <p className="text-[11px] font-semibold text-slate-600 uppercase tracking-wider">
+            Select Theme Color / থিম রঙ বাছুন:
+          </p>
+          <div className="flex flex-wrap gap-3">
+            {([
+              { key: "teal",   label: "Teal (Default)", color: "#0f766e" },
+              { key: "indigo", label: "Indigo",          color: "#4338ca" },
+              { key: "blue",   label: "Blue",            color: "#1d4ed8" },
+              { key: "violet", label: "Violet",          color: "#7c3aed" },
+              { key: "rose",   label: "Rose",            color: "#e11d48" },
+              { key: "orange", label: "Orange",          color: "#ea580c" },
+              { key: "green",  label: "Green",           color: "#16a34a" },
+              { key: "slate",  label: "Slate",           color: "#334155" },
+            ] as const).map((opt) => {
+              const isSelected = (form.themeColor || "#0f766e") === opt.color;
+              return (
+                <button
+                  key={opt.key}
+                  type="button"
+                  title={opt.label}
+                  onClick={() => {
+                    setForm((p) => ({ ...p, themeColor: opt.color }));
+                    updateSettings({ ...form, themeColor: opt.color });
+                  }}
+                  className="relative w-9 h-9 rounded-full border-[3px] transition-all cursor-pointer active:scale-95 hover:scale-105"
+                  style={{
+                    backgroundColor: opt.color,
+                    borderColor: isSelected ? "white" : "transparent",
+                    outline: isSelected ? `3px solid ${opt.color}` : "none",
+                    outlineOffset: "1px",
+                  }}
+                >
+                  {isSelected && (
+                    <Check className="w-4 h-4 text-white absolute inset-0 m-auto" />
+                  )}
+                </button>
+              );
+            })}
+          </div>
+          <p className="text-[10px] text-slate-400 mt-1">
+            থিম রঙ মোবাইল অ্যাপে তাৎক্ষণিক কার্যকর হয়। ওয়েবে Save করলে পরবর্তী রিলিজে সম্পূর্ণ প্রয়োগ হবে।
+          </p>
         </div>
       </div>
 

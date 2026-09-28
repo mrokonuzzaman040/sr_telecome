@@ -103,10 +103,10 @@ function MainDashboard() {
   }
 
   const handleSaleComplete = (sale: Sale, printType: "thermal" | "a4" | "none") => {
-    if (printType === "thermal" || printType === "a4") {
-      setInvoicePrintMode(printType);
-      setActiveInvoiceSale(sale);
-    }
+    // Always show the invoice modal after a sale so the user can review and optionally print
+    // The printType sets the default tab: "none" defaults to thermal view
+    setInvoicePrintMode(printType === "none" ? "thermal" : printType);
+    setActiveInvoiceSale(sale);
   };
 
   const handleSelectInvoice = (sale: Sale, mode: "thermal" | "a4") => {

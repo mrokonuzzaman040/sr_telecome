@@ -18,6 +18,8 @@ export const initialShopSettings: ShopSettings = {
   invoicePadding: 4,
   expensePrefix: "EXP",
   skuPrefix: "BK",
+  themeColor: "#0f766e",
+  fingerprintEnabled: false,
 };
 
 export const initialProducts: Product[] = [

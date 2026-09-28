@@ -287,9 +287,9 @@ class PdfInvoiceService {
     final fontRegular = await _loadFont(bold: false);
     final fontBold = await _loadFont(bold: true);
 
-    final dateFormatted = record.createdAt.contains('T')
-        ? record.createdAt.split('T').first
-        : record.createdAt;
+    final createdAt = record.createdAt ?? '';
+    final dateFormatted =
+        createdAt.contains('T') ? createdAt.split('T').first : createdAt;
 
     pdf.addPage(
       pw.Page(
@@ -416,9 +416,9 @@ class PdfInvoiceService {
                       fontBold,
                       color: record.priceDifference > 0 ? PdfColors.red800 : PdfColors.green800,
                     ),
-                    if (record.reason != null && record.reason!.isNotEmpty) ...[
+                    if (record.reason.isNotEmpty) ...[
                       pw.SizedBox(height: 4),
-                      _totalRow('রিটার্নের কারণ:', record.reason!, fontRegular),
+                      _totalRow('রিটার্নের কারণ:', record.reason, fontRegular),
                     ],
                   ],
                 ),

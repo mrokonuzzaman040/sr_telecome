@@ -2,7 +2,7 @@
 
 import React, { useMemo } from "react";
 import { useStore } from "@/context/StoreContext";
-import { formatBDT, formatDateTime, formatDateOnly, getTodayDateString } from "@/utils/formatters";
+import { formatBDT, formatDateTime, formatDateOnly, getTodayDateString, getLocalDateFromISO } from "@/utils/formatters";
 import { DashboardTab } from "@/components/Sidebar";
 import { Sale } from "@/types";
 import {
@@ -28,6 +28,7 @@ import {
   FileSpreadsheet,
   Layers,
   Barcode,
+  Eye,
 } from "lucide-react";
 
 interface DashboardOverviewProps {
@@ -55,15 +56,15 @@ export function DashboardOverview({
   const activeDateStr = selectedDate || getTodayDateString();
   const isToday = activeDateStr === getTodayDateString();
 
-  // Selected Date Sales
+  // Selected Date Sales — use local date extraction to handle UTC+6 timezone correctly
   const todaySales = useMemo(() => {
-    return sales.filter((s) => s.createdAt.startsWith(activeDateStr));
+    return sales.filter((s) => getLocalDateFromISO(s.createdAt) === activeDateStr);
   }, [sales, activeDateStr]);
 
   const todaySalesTotal = todaySales.reduce((acc, s) => acc + s.payableAmount, 0);
   const todayGrossProfit = todaySales.reduce((acc, s) => acc + s.grossProfit, 0);
 
-  // Selected Date Expenses
+  // Selected Date Expenses — expenses use YYYY-MM-DD date field (already local)
   const todayExpenses = useMemo(() => {
     return expenses.filter((e) => e.date === activeDateStr);
   }, [expenses, activeDateStr]);
@@ -74,7 +75,7 @@ export function DashboardOverview({
   // Dues & Ledger
   const totalOutstandingDue = customers.reduce((acc, c) => acc + c.currentDue, 0);
   const totalDueCollectedToday = duePayments
-    .filter((d) => d.createdAt.startsWith(activeDateStr))
+    .filter((d) => getLocalDateFromISO(d.createdAt) === activeDateStr)
     .reduce((acc, d) => acc + d.amount, 0);
 
   // Physical Cash in Drawer
@@ -492,7 +493,7 @@ export function DashboardOverview({
                     <th className="py-2.5 px-3.5">Items</th>
                     <th className="py-2.5 px-3.5 text-right">Amount</th>
                     <th className="py-2.5 px-3.5 text-center">Status</th>
-                    <th className="py-2.5 px-3.5 text-center">Print</th>
+                    <th className="py-2.5 px-3.5 text-center">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
@@ -542,6 +543,15 @@ export function DashboardOverview({
                       </td>
                       <td className="py-2.5 px-3.5 text-center whitespace-nowrap">
                         <div className="flex items-center justify-center gap-1">
+                          <button
+                            type="button"
+                            onClick={() => onSelectInvoice(sale, "thermal")}
+                            className="p-1 rounded border border-slate-200 hover:bg-slate-100 text-slate-600 transition"
+                            title="Preview Invoice"
+                            aria-label="Preview Invoice"
+                          >
+                            <Eye className="w-3.5 h-3.5" />
+                          </button>
                           <button
                             type="button"
                             onClick={() => onSelectInvoice(sale, "thermal")}

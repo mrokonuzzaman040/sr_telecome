@@ -7,7 +7,6 @@ import '../../models/sale.dart';
 import '../../providers/auth_provider.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/invoice_preview_sheet.dart';
-import '../../services/pdf_invoice_service.dart';
 import '../returns/return_form_screen.dart';
 
 class CartModal extends StatefulWidget {
@@ -141,61 +140,9 @@ class _CartModalState extends State<CartModal> {
       if (!mounted) return;
       Navigator.pop(context); // Close cart
 
-      // Show Invoice confirmation with the 2 Print Options
-      showDialog(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          icon: const Icon(Icons.check_circle, color: AppTheme.success, size: 54),
-          title: const Text('বিক্রয় সফল হয়েছে!'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('ইনভয়েস নম্বর: ${sale.invoiceNo}', style: const TextStyle(fontWeight: FontWeight.bold)),
-              const SizedBox(height: 6),
-              Text('ক্রেতা: ${sale.customerName}'),
-              Text('মোট পরিশোধিত: ৳${currencyFormat.format(sale.paidAmount)}'),
-              if (sale.dueAmount > 0)
-                Text(
-                  'মোট বাকি: ৳${currencyFormat.format(sale.dueAmount)}',
-                  style: const TextStyle(color: AppTheme.danger, fontWeight: FontWeight.bold),
-                ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('ঠিক আছে'),
-            ),
-            OutlinedButton.icon(
-              icon: const Icon(Icons.receipt_long, size: 16),
-              label: const Text('ইনভয়েস'),
-              onPressed: () {
-                Navigator.pop(ctx);
-                final isAdmin = Provider.of<AuthProvider>(context, listen: false).isAdmin;
-                showInvoicePreview(context, sale, isAdmin: isAdmin);
-              },
-            ),
-            ElevatedButton.icon(
-              icon: const Icon(Icons.print, size: 16),
-              label: const Text('১. প্রিন্ট'),
-              onPressed: () {
-                Navigator.pop(ctx);
-                PdfInvoiceService.printSale(context, sale);
-              },
-            ),
-            ElevatedButton.icon(
-              icon: const Icon(Icons.picture_as_pdf, size: 16),
-              label: const Text('২. PDF / শেয়ার'),
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.indigo),
-              onPressed: () {
-                Navigator.pop(ctx);
-                PdfInvoiceService.shareSalePdf(context, sale);
-              },
-            ),
-          ],
-        ),
-      );
+      // Auto-show invoice preview immediately after every sale
+      final isAdmin = Provider.of<AuthProvider>(context, listen: false).isAdmin;
+      showInvoicePreview(context, sale, isAdmin: isAdmin);
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

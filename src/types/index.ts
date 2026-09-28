@@ -267,6 +267,9 @@ export interface ShopSettings {
   invoicePadding: number; // digits to zero-pad the running number to, e.g. 4 -> 0001
   expensePrefix: string; // e.g. "EXP" for expense voucher numbers
   skuPrefix: string; // e.g. "BK" for auto-generated product SKUs
+  // Appearance & Security
+  themeColor?: string; // Hex color for accent/primary theme e.g. "#0f172a"
+  fingerprintEnabled?: boolean; // Whether to use biometric/fingerprint login
 }
 
 export type NotificationType = 'sale' | 'low_stock' | 'due' | 'system';

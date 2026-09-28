@@ -130,35 +130,57 @@ class _HomeScreenState extends State<HomeScreen> {
           return Scaffold(
             body: Row(
               children: [
-                NavigationRail(
-                  selectedIndex: _currentIndex,
-                  onDestinationSelected: _onTabSelected,
-                  labelType: NavigationRailLabelType.all,
-                  leading: Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    child: Container(
-                      width: 44,
-                      height: 44,
-                      decoration: BoxDecoration(
-                        color: AppTheme.primary,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: const Icon(Icons.menu_book_rounded, color: Colors.white, size: 24),
+                SafeArea(
+                  right: false,
+                  child: NavigationRail(
+                    selectedIndex: _currentIndex,
+                    onDestinationSelected: _onTabSelected,
+                    labelType: constraints.maxWidth >= 900
+                        ? NavigationRailLabelType.none
+                        : NavigationRailLabelType.all,
+                    extended: constraints.maxWidth >= 900,
+                    minWidth: 76,
+                    minExtendedWidth: 190,
+                    backgroundColor: Colors.white,
+                    indicatorColor: AppTheme.primary.withValues(alpha: 0.12),
+                    selectedIconTheme: const IconThemeData(color: AppTheme.primary, size: 24),
+                    unselectedIconTheme: const IconThemeData(color: AppTheme.textMuted, size: 24),
+                    selectedLabelTextStyle: const TextStyle(
+                      color: AppTheme.primary,
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
                     ),
+                    unselectedLabelTextStyle: const TextStyle(
+                      color: AppTheme.textMuted,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                    ),
+                    leading: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      child: Container(
+                        width: 44,
+                        height: 44,
+                        decoration: BoxDecoration(
+                          color: AppTheme.primary,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: const Icon(Icons.menu_book_rounded, color: Colors.white, size: 24),
+                      ),
+                    ),
+                    destinations: destinations.map((d) {
+                      Widget iconWidget = Icon(d.icon);
+                      Widget selIconWidget = Icon(d.selectedIcon);
+                      if (d.badgeCount > 0) {
+                        iconWidget = Badge(label: Text('${d.badgeCount}'), child: iconWidget);
+                        selIconWidget = Badge(label: Text('${d.badgeCount}'), child: selIconWidget);
+                      }
+                      return NavigationRailDestination(
+                        icon: iconWidget,
+                        selectedIcon: selIconWidget,
+                        label: Text(d.label, maxLines: 1, overflow: TextOverflow.ellipsis),
+                      );
+                    }).toList(),
                   ),
-                  destinations: destinations.map((d) {
-                    Widget iconWidget = Icon(d.icon);
-                    Widget selIconWidget = Icon(d.selectedIcon);
-                    if (d.badgeCount > 0) {
-                      iconWidget = Badge(label: Text('${d.badgeCount}'), child: iconWidget);
-                      selIconWidget = Badge(label: Text('${d.badgeCount}'), child: selIconWidget);
-                    }
-                    return NavigationRailDestination(
-                      icon: iconWidget,
-                      selectedIcon: selIconWidget,
-                      label: Text(d.label, style: const TextStyle(fontSize: 12)),
-                    );
-                  }).toList(),
                 ),
                 const VerticalDivider(thickness: 1, width: 1, color: AppTheme.border),
                 Expanded(child: content),
@@ -177,96 +199,142 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildMobileNavBar(List<_NavDestinationData> destinations) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        border: const Border(
-          top: BorderSide(color: Color(0xFFE2E8F0), width: 1),
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 10,
-            offset: const Offset(0, -3),
-          ),
-        ],
-      ),
-      child: SafeArea(
-        top: false,
-        bottom: true,
-        child: SizedBox(
-          height: 64,
-          child: Row(
-            children: List.generate(destinations.length, (index) {
-              final d = destinations[index];
-              final isSelected = _currentIndex == index;
+    final textScaler = MediaQuery.textScalerOf(context);
 
-              return Expanded(
-                child: Material(
-                  color: Colors.transparent,
-                  child: InkWell(
-                    onTap: () => _onTabSelected(index),
-                    splashColor: AppTheme.primary.withValues(alpha: 0.1),
-                    highlightColor: AppTheme.primary.withValues(alpha: 0.05),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 4),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          // Icon container with smooth animated pill indicator
-                          AnimatedContainer(
-                            duration: const Duration(milliseconds: 200),
-                            curve: Curves.easeInOut,
-                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 3),
-                            decoration: BoxDecoration(
-                              color: isSelected
-                                  ? AppTheme.primary.withValues(alpha: 0.12)
-                                  : Colors.transparent,
-                              borderRadius: BorderRadius.circular(16),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        // Per-tab available width drives every visual metric so the bar adapts
+        // from ~320dp phones up to small tablets without clipping or overflow.
+        final slotWidth = constraints.maxWidth / destinations.length;
+        final isNarrow = slotWidth < 62;
+        final isVeryNarrow = slotWidth < 50;
+
+        final iconSize = isVeryNarrow ? 19.0 : (isNarrow ? 20.0 : 22.0);
+        final pillHPadding = isVeryNarrow ? 8.0 : (isNarrow ? 10.0 : 14.0);
+        final labelFontSize = isVeryNarrow ? 9.0 : (isNarrow ? 9.8 : 10.5);
+        final verticalPadding = isNarrow ? 3.0 : 4.0;
+
+        // Grow the bar with the OS font-size setting instead of overflowing,
+        // clamped so extreme accessibility sizes cannot eat the whole screen.
+        final textScale = textScaler.scale(1.0).clamp(1.0, 1.4);
+        final labelHeight = labelFontSize * 1.25 * textScale;
+        final barHeight = (verticalPadding * 2) + (iconSize + 6) + 2 + labelHeight;
+
+        return Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            border: const Border(
+              top: BorderSide(color: Color(0xFFE2E8F0), width: 1),
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.04),
+                blurRadius: 10,
+                offset: const Offset(0, -3),
+              ),
+            ],
+          ),
+          child: SafeArea(
+            top: false,
+            bottom: true,
+            child: SizedBox(
+              height: barHeight,
+              child: Row(
+                children: List.generate(destinations.length, (index) {
+                  final d = destinations[index];
+                  final isSelected = _currentIndex == index;
+                  final color = isSelected ? AppTheme.primary : AppTheme.textMuted;
+
+                  final icon = Icon(
+                    isSelected ? d.selectedIcon : d.icon,
+                    size: iconSize,
+                    color: color,
+                  );
+
+                  return Expanded(
+                    child: Semantics(
+                      button: true,
+                      selected: isSelected,
+                      label: d.label,
+                      child: Material(
+                        color: Colors.transparent,
+                        child: InkWell(
+                          onTap: () => _onTabSelected(index),
+                          splashColor: AppTheme.primary.withValues(alpha: 0.1),
+                          highlightColor: AppTheme.primary.withValues(alpha: 0.05),
+                          child: Padding(
+                            padding: EdgeInsets.symmetric(
+                              vertical: verticalPadding,
+                              horizontal: 1,
                             ),
-                            child: d.badgeCount > 0
-                                ? Badge(
-                                    label: Text(
-                                      '${d.badgeCount}',
-                                      style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
-                                    ),
-                                    backgroundColor: AppTheme.danger,
-                                    child: Icon(
-                                      isSelected ? d.selectedIcon : d.icon,
-                                      size: 22,
-                                      color: isSelected ? AppTheme.primary : AppTheme.textMuted,
-                                    ),
-                                  )
-                                : Icon(
-                                    isSelected ? d.selectedIcon : d.icon,
-                                    size: 22,
-                                    color: isSelected ? AppTheme.primary : AppTheme.textMuted,
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                // Icon container with smooth animated pill indicator
+                                AnimatedContainer(
+                                  duration: const Duration(milliseconds: 200),
+                                  curve: Curves.easeInOut,
+                                  padding: EdgeInsets.symmetric(
+                                    horizontal: pillHPadding,
+                                    vertical: 3,
                                   ),
-                          ),
-                          const SizedBox(height: 2),
-                          // Crisp single-line label
-                          Text(
-                            d.label,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              fontSize: 10.5,
-                              fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-                              color: isSelected ? AppTheme.primary : AppTheme.textMuted,
-                              height: 1.1,
+                                  decoration: BoxDecoration(
+                                    color: isSelected
+                                        ? AppTheme.primary.withValues(alpha: 0.12)
+                                        : Colors.transparent,
+                                    borderRadius: BorderRadius.circular(16),
+                                  ),
+                                  child: d.badgeCount > 0
+                                      ? Badge(
+                                          label: Text(
+                                            d.badgeCount > 99 ? '99+' : '${d.badgeCount}',
+                                            style: TextStyle(
+                                              fontSize: isVeryNarrow ? 8 : 9,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                          backgroundColor: AppTheme.danger,
+                                          textColor: Colors.white,
+                                          child: icon,
+                                        )
+                                      : icon,
+                                ),
+                                const SizedBox(height: 2),
+                                // Label scales down to fit instead of being cut off
+                                SizedBox(
+                                  height: labelHeight,
+                                  child: FittedBox(
+                                    fit: BoxFit.scaleDown,
+                                    alignment: Alignment.center,
+                                    child: Text(
+                                      d.label,
+                                      maxLines: 1,
+                                      softWrap: false,
+                                      style: TextStyle(
+                                        fontSize: labelFontSize,
+                                        fontWeight: isSelected
+                                            ? FontWeight.bold
+                                            : FontWeight.w500,
+                                        color: color,
+                                        height: 1.25,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
-                        ],
+                        ),
                       ),
                     ),
-                  ),
-                ),
-              );
-            }),
+                  );
+                }),
+              ),
+            ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 

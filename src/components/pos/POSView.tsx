@@ -277,10 +277,11 @@ export function POSView({ onSaleComplete }: POSViewProps) {
     }
   };
 
-  // Submit Sale
-  const handleCompleteSale = (printType: "thermal" | "a4" | "none") => {
+  // Submit Sale — async so we can await alerts and close mobile cart first
+  const handleCompleteSale = async (printType: "thermal" | "a4" | "none") => {
     if (recalculatedCart.length === 0) {
-      showAlert("Please add at least one item to the cart.", {
+      setIsMobileCartOpen(false);
+      await showAlert("Please add at least one item to the cart.", {
         title: "Empty Cart",
         type: "warning",
       });
@@ -288,13 +289,17 @@ export function POSView({ onSaleComplete }: POSViewProps) {
     }
 
     if (dueAmount > 0 && (!activeCustomer || activeCustomer.id === "walkin")) {
-      showAlert(
+      // Close mobile cart drawer first so the alert is clearly visible on mobile
+      setIsMobileCartOpen(false);
+      await showAlert(
         "Due/Baki is only allowed for registered customers or agents. Please select or create a customer profile to record dues.",
         {
           title: "Registered Customer Required",
           type: "info",
         }
       );
+      // Re-open cart so user can fix the selection
+      setIsMobileCartOpen(true);
       return;
     }
 
@@ -327,7 +332,7 @@ export function POSView({ onSaleComplete }: POSViewProps) {
     setPaidAmountInput("");
     setSaleNotes("");
 
-    // Trigger Print or modal
+    // Always show invoice after sale — printType is passed as a hint for which tab opens by default
     onSaleComplete(saleRecord, printType);
   };
 

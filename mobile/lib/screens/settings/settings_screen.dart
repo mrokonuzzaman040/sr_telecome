@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/store_provider.dart';
+import '../../providers/theme_provider.dart';
 import '../../services/api_service.dart';
 import '../../services/biometric_service.dart';
 import '../../theme/app_theme.dart';
@@ -399,6 +400,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
             const SizedBox(height: 10),
           ],
 
+          // ── Theme Color Picker ─────────────────────────────────────────
+          SectionHeader(title: 'থিম রঙ (Appearance)'),
+          const _ThemeColorPicker(),
+          const SizedBox(height: 20),
+          // ──────────────────────────────────────────────────────────────
           SectionHeader(title: 'হার্ডওয়েয়ার'),
           Card(
             child: ListTile(
@@ -467,6 +473,103 @@ class _SettingsScreenState extends State<SettingsScreen> {
           const SizedBox(width: 10),
           Expanded(child: Text(text, style: const TextStyle(fontSize: 13, color: AppTheme.textDark))),
         ],
+      ),
+    );
+  }
+}
+
+
+/// ─────────────────────────────────────────────────────────────────────────
+/// Theme Color Picker widget — displayed inside SettingsScreen.
+/// ─────────────────────────────────────────────────────────────────────────
+class _ThemeColorPicker extends StatelessWidget {
+  const _ThemeColorPicker();
+
+  @override
+  Widget build(BuildContext context) {
+    final themeProvider = Provider.of<ThemeProvider>(context);
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(Icons.palette_outlined,
+                      color: Theme.of(context).colorScheme.primary, size: 20),
+                ),
+                const SizedBox(width: 12),
+                const Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'অ্যাপের রঙ পরিবর্তন করুন',
+                        style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+                      ),
+                      SizedBox(height: 2),
+                      Text(
+                        'Choose App Theme Color',
+                        style: TextStyle(fontSize: 11.5, color: AppTheme.textMuted),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 14),
+            Wrap(
+              spacing: 10,
+              runSpacing: 10,
+              children: kThemeColorOptions.map((opt) {
+                final isSelected = themeProvider.selectedColorKey == opt.key;
+                return GestureDetector(
+                  onTap: () => themeProvider.setThemeColor(opt.key),
+                  child: Tooltip(
+                    message: opt.labelBn,
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 180),
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        color: opt.primary,
+                        shape: BoxShape.circle,
+                        border: isSelected
+                            ? Border.all(color: Colors.white, width: 3)
+                            : Border.all(color: Colors.transparent, width: 3),
+                        boxShadow: isSelected
+                            ? [
+                                BoxShadow(
+                                  color: opt.primary.withValues(alpha: 0.55),
+                                  blurRadius: 10,
+                                  offset: const Offset(0, 3),
+                                ),
+                              ]
+                            : [],
+                      ),
+                      child: isSelected
+                          ? const Icon(Icons.check, color: Colors.white, size: 20)
+                          : null,
+                    ),
+                  ),
+                );
+              }).toList(),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              'বর্তমান: ${themeProvider.selectedOption.labelBn} • থিম বাছাই সাথে সাথে সর্বত্র প্রয়োগ হবে',
+              style: const TextStyle(fontSize: 11, color: AppTheme.textMuted),
+            ),
+          ],
+        ),
       ),
     );
   }
