@@ -163,7 +163,7 @@ class StoreProvider extends ChangeNotifier {
   }
 
   Future<void> loadAllData() async {
-    debugPrint('📡 Starting data load from server...');
+    debugPrint('📡 Starting combined data sync from server...');
     _isLoading = true;
     _errorMessage = null;
     _isSessionExpired = false;
@@ -178,50 +178,15 @@ class StoreProvider extends ChangeNotifier {
         return;
       }
 
-      final errors = <String>[];
+      // Use combined sync endpoint to reduce database connections
+      final syncData = await ApiService.fetchSyncData();
+      
+      final fetchedProducts = (syncData['products'] as List?)?.map((e) => Product.fromJson(e)).toList() ?? [];
+      final fetchedCustomers = (syncData['customers'] as List?)?.map((e) => Customer.fromJson(e)).toList() ?? [];
+      final fetchedSales = (syncData['sales'] as List?)?.map((e) => Sale.fromJson(e)).toList() ?? [];
+      final fetchedExpenses = (syncData['expenses'] as List?)?.map((e) => Expense.fromJson(e)).toList() ?? [];
 
-      // Fetch all core resources with domain-specific error capturing
-      final results = await Future.wait([
-        ApiService.fetchProducts().catchError((e) {
-          if (e is AuthRequiredException) _isSessionExpired = true;
-          errors.add('পণ্য (${e.toString().replaceFirst("Exception: ", "")})');
-          return <Product>[];
-        }),
-        ApiService.fetchCustomers().catchError((e) {
-          if (e is AuthRequiredException) _isSessionExpired = true;
-          errors.add('গ্রাহক');
-          return <Customer>[];
-        }),
-        ApiService.fetchSales().catchError((e) {
-          if (e is AuthRequiredException) _isSessionExpired = true;
-          errors.add('বিক্রয়');
-          return <Sale>[];
-        }),
-        ApiService.fetchExpenses().catchError((e) {
-          if (e is AuthRequiredException) _isSessionExpired = true;
-          errors.add('খরচ');
-          return <Expense>[];
-        }),
-        ApiService.fetchPublishers().catchError((e) {
-          if (e is AuthRequiredException) _isSessionExpired = true;
-          errors.add('প্রকাশনী');
-          return <Publisher>[];
-        }),
-        ApiService.fetchReturns().catchError((e) {
-          if (e is AuthRequiredException) _isSessionExpired = true;
-          errors.add('ফেরত');
-          return <ReturnRecord>[];
-        }),
-      ]);
-
-      final fetchedProducts = results[0] as List<Product>;
-      final fetchedCustomers = results[1] as List<Customer>;
-      final fetchedSales = results[2] as List<Sale>;
-      final fetchedExpenses = results[3] as List<Expense>;
-      final fetchedPublishers = results[4] as List<Publisher>;
-      final fetchedReturns = results[5] as List<ReturnRecord>;
-
-      debugPrint('📦 Fetched: ${fetchedSales.length} sales, ${fetchedProducts.length} products, ${fetchedCustomers.length} customers');
+      debugPrint('📦 Synced: ${fetchedSales.length} sales, ${fetchedProducts.length} products, ${fetchedCustomers.length} customers, ${fetchedExpenses.length} expenses');
 
       if (fetchedProducts.isNotEmpty || _products.isEmpty) {
         _products = fetchedProducts;
@@ -237,30 +202,13 @@ class StoreProvider extends ChangeNotifier {
       }
       _expenses = fetchedExpenses;
       _expensesVersion++;
-      if (fetchedPublishers.isNotEmpty || _publishers.isEmpty) {
-        _publishers = fetchedPublishers;
-        _publishersVersion++;
-      }
-      _returns = fetchedReturns;
-      _returnsVersion++;
-
-      if (_isSessionExpired) {
-        _errorMessage = 'লগইন সেশনের মেয়াদ শেষ। অনুগ্রহ করে আবার লগইন করুন।';
-      } else if (errors.length >= 5) {
-        _errorMessage = 'সার্ভার থেকে তথ্য লোড করা যায়নি। ইন্টারনেট সংযোগ বা সার্ভার পরীক্ষা করুন।';
-        await _loadOfflineCache();
-      } else if (errors.isNotEmpty) {
-        _errorMessage = 'কিছু তথ্য সিঙ্ক হয়নি (${errors.join(", ")})';
-        _isOffline = false;
-        await _saveOfflineCache();
-      } else {
-        _isOffline = false;
-        _errorMessage = null;
-        await _saveOfflineCache();
-      }
-      debugPrint('✅ Data load completed successfully');
+      
+      _isOffline = false;
+      _errorMessage = null;
+      await _saveOfflineCache();
+      debugPrint('✅ Combined sync completed successfully');
     } catch (e) {
-      debugPrint('❌ Data load failed: $e');
+      debugPrint('❌ Combined sync failed: $e');
       if (e is AuthRequiredException) {
         _isSessionExpired = true;
         _errorMessage = 'লগইন সেশনের মেয়াদ শেষ। পুনরায় লগইন করুন।';

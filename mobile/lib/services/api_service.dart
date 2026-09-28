@@ -298,6 +298,22 @@ class ApiService {
     }
   }
 
+  // --- COMBINED SYNC ENDPOINT FOR MOBILE ---
+  // Single endpoint to fetch all data - reduces database connections significantly
+  static Future<Map<String, dynamic>> fetchSyncData() async {
+    final base = await getBaseUrl();
+    final url = Uri.parse('$base/api/sync');
+    final res = await http.get(url, headers: await _authHeaders()).timeout(defaultTimeout);
+
+    _check401(res);
+    if (res.statusCode == 200) {
+      final decoded = jsonDecode(res.body);
+      return decoded['data'] as Map<String, dynamic>;
+    } else {
+      throw Exception('Failed to sync data: ${_extractError(res)}');
+    }
+  }
+
   static Future<Sale> createSale(Sale sale) async {
     final base = await getBaseUrl();
     final url = Uri.parse('$base/api/sales');

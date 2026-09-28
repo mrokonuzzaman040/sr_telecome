@@ -1,23 +1,49 @@
 import { NextRequest } from "next/server";
+import Redis from "ioredis";
 
 interface RateLimitRecord {
   count: number;
   resetAt: number;
 }
 
+// In-memory fallback for when Redis is unavailable
 const rateLimitMap = new Map<string, RateLimitRecord>();
+
+// Redis client (initialized lazily)
+let redisClient: Redis | null = null;
+
+function getRedisClient(): Redis | null {
+  if (redisClient) return redisClient;
+  
+  const redisUrl = process.env.REDIS_URL;
+  if (!redisUrl) return null;
+  
+  try {
+    redisClient = new Redis(redisUrl, {
+      maxRetriesPerRequest: 2,
+      retryStrategy: (times) => {
+        if (times > 2) return null; // Don't retry after 2 attempts
+        return Math.min(times * 50, 2000);
+      },
+      connectTimeout: 2000,
+      lazyConnect: true,
+    });
+    
+    // Handle Redis errors gracefully
+    redisClient.on('error', (err) => {
+      console.warn('[Redis] Connection error, falling back to in-memory:', err.message);
+      redisClient = null;
+    });
+    
+    return redisClient;
+  } catch (err) {
+    console.warn('[Redis] Failed to initialize Redis, falling back to in-memory:', err);
+    return null;
+  }
+}
 
 /**
  * Extracts client IP address for rate-limiting purposes.
- *
- * `x-forwarded-for` / `x-real-ip` / `cf-connecting-ip` are client-settable
- * headers and must never be trusted directly - an attacker can set any value
- * to always land in someone else's rate-limit bucket, or rotate values to
- * evade their own limit entirely. `x-vercel-forwarded-for` is instead set by
- * Vercel's edge network itself and cannot be overridden by the client, so it
- * is the only source trusted here. If it is absent (e.g. running outside
- * Vercel), every request collapses to one shared "unknown" bucket - safe
- * (fails toward more restrictive, shared limiting) rather than spoofable.
  */
 export function getClientIp(req: NextRequest): string {
   const vercelIp = req.headers.get("x-vercel-forwarded-for");
@@ -26,18 +52,56 @@ export function getClientIp(req: NextRequest): string {
 }
 
 /**
- * Enforces in-memory sliding-window rate limit.
- *
+ * Redis-based rate limiter with in-memory fallback
+ * 
  * @param key Unique identifier (e.g. `login:${ip}`)
  * @param limit Max allowed requests within window
  * @param windowSeconds Window length in seconds
  */
-export function checkRateLimit(
+export async function checkRateLimit(
   key: string,
   limit: number,
   windowSeconds: number
-): { allowed: boolean; remaining: number; retryAfterSeconds: number } {
+): Promise<{ allowed: boolean; remaining: number; retryAfterSeconds: number }> {
   const now = Date.now();
+  const resetAt = now + windowSeconds * 1000;
+  
+  // Try Redis first
+  const redis = getRedisClient();
+  if (redis) {
+    try {
+      const redisKey = `ratelimit:${key}`;
+      
+      // Use Redis INCR for atomic operations
+      const pipeline = redis.pipeline();
+      pipeline.incr(redisKey);
+      pipeline.expire(redisKey, windowSeconds);
+      const results = await pipeline.exec();
+      
+      if (results && results[0] && results[0][1] !== null) {
+        const count = results[0][1] as number;
+        
+        if (count > limit) {
+          return {
+            allowed: false,
+            remaining: 0,
+            retryAfterSeconds: Math.ceil((resetAt - now) / 1000),
+          };
+        }
+        
+        return {
+          allowed: true,
+          remaining: limit - count,
+          retryAfterSeconds: 0,
+        };
+      }
+    } catch (err) {
+      console.warn('[Redis] Rate limit check failed, falling back to in-memory:', err);
+      // Fall through to in-memory implementation
+    }
+  }
+  
+  // In-memory fallback (as before)
   const record = rateLimitMap.get(key);
 
   // Periodic pruning if map gets large
@@ -50,7 +114,7 @@ export function checkRateLimit(
   }
 
   if (!record || record.resetAt < now) {
-    rateLimitMap.set(key, { count: 1, resetAt: now + windowSeconds * 1000 });
+    rateLimitMap.set(key, { count: 1, resetAt });
     return { allowed: true, remaining: limit - 1, retryAfterSeconds: 0 };
   }
 
