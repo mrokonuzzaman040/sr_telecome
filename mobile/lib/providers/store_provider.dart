@@ -606,6 +606,42 @@ class StoreProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Adds [quantity] units to a product that is already in the catalog.
+  ///
+  /// Re-uses the create endpoint, whose barcode conflict clause increments
+  /// stock server-side, so no extra API call or duplicate row is needed.
+  Future<void> addStockToProduct(String productId, int quantity) async {
+    if (quantity <= 0) return;
+    final index = _products.indexWhere((p) => p.id == productId);
+    if (index == -1) return;
+
+    final current = _products[index];
+    final updated = await ApiService.createProduct(Product(
+      id: current.id,
+      name: current.name,
+      bengaliName: current.bengaliName,
+      category: current.category,
+      barcode: current.barcode,
+      sku: current.sku,
+      publisher: current.publisher,
+      bookClass: current.bookClass,
+      subject: current.subject,
+      itemType: current.itemType,
+      customCommissionRate: current.customCommissionRate,
+      editionYear: current.editionYear,
+      imageUrl: current.imageUrl,
+      buyPrice: current.buyPrice,
+      mrp: current.mrp,
+      stockQty: quantity,
+      minStockAlert: current.minStockAlert,
+      unit: current.unit,
+    ));
+
+    _products[index] = updated;
+    _productsVersion++;
+    notifyListeners();
+  }
+
   // --- CUSTOMER CRUD ---
   Future<void> addCustomer(Customer customer) async {
     final created = await ApiService.createCustomer(customer);

@@ -93,10 +93,10 @@ class _PublishersScreenState extends State<PublishersScreen> {
                                 child: Row(
                                   children: [
                                     CircleAvatar(
-                                      backgroundColor: AppTheme.primary.withOpacity(0.1),
+                                      backgroundColor: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
                                       child: Text(
                                         publisher.name.isNotEmpty ? publisher.name[0].toUpperCase() : '?',
-                                        style: const TextStyle(color: AppTheme.primary, fontWeight: FontWeight.bold),
+                                        style: TextStyle(color: Theme.of(context).colorScheme.primary, fontWeight: FontWeight.bold),
                                       ),
                                     ),
                                     const SizedBox(width: 12),

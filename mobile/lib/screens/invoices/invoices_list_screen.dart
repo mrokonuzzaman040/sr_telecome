@@ -82,11 +82,11 @@ class _InvoicesListScreenState extends State<InvoicesListScreen> {
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             child: Row(
               children: [
-                _filterChip('all', 'সব'),
+                _filterChip('all', 'সব', context),
                 const SizedBox(width: 8),
-                _filterChip('due', 'বাকি আছে'),
+                _filterChip('due', 'বাকি আছে', context),
                 const SizedBox(width: 8),
-                _filterChip('paid', 'পরিশোধিত'),
+                _filterChip('paid', 'পরিশোধিত', context),
               ],
             ),
           ),
@@ -152,12 +152,12 @@ class _InvoicesListScreenState extends State<InvoicesListScreen> {
     );
   }
 
-  Widget _filterChip(String value, String label) {
+  Widget _filterChip(String value, String label, BuildContext context) {
     final selected = _filter == value;
     return ChoiceChip(
       label: Text(label, style: TextStyle(fontSize: 12, color: selected ? Colors.white : AppTheme.textDark)),
       selected: selected,
-      selectedColor: AppTheme.primary,
+      selectedColor: Theme.of(context).colorScheme.primary,
       onSelected: (_) => setState(() => _filter = value),
     );
   }

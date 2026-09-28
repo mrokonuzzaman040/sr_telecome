@@ -79,11 +79,11 @@ class _LoginScreenState extends State<LoginScreen> {
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
-          title: const Row(
+          title: Row(
             children: [
-              Icon(Icons.dns_rounded, color: AppTheme.primary),
-              SizedBox(width: 8),
-              Text('সার্ভার সেটিংস', style: TextStyle(fontSize: 16)),
+              Icon(Icons.dns_rounded, color: Theme.of(context).colorScheme.primary),
+              const SizedBox(width: 8),
+              const Text('সার্ভার সেটিংস', style: TextStyle(fontSize: 16)),
             ],
           ),
           content: Column(
@@ -221,9 +221,9 @@ class _LoginScreenState extends State<LoginScreen> {
                       width: 80,
                       height: 80,
                       decoration: BoxDecoration(
-                        color: AppTheme.primary.withValues(alpha: 0.2),
+                        color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.2),
                         shape: BoxShape.circle,
-                        border: Border.all(color: AppTheme.primary, width: 2),
+                        border: Border.all(color: Theme.of(context).colorScheme.primary, width: 2),
                       ),
                       clipBehavior: Clip.antiAlias,
                       child: Image.asset(

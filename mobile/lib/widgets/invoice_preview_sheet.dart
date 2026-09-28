@@ -59,7 +59,7 @@ void showInvoicePreview(BuildContext context, Sale sale, {required bool isAdmin}
             const Divider(height: 24),
             Row(
               children: [
-                Icon(sale.customerType == 'agent' ? Icons.storefront : Icons.person, size: 16, color: AppTheme.primary),
+                Icon(sale.customerType == 'agent' ? Icons.storefront : Icons.person, size: 16, color: Theme.of(context).colorScheme.primary),
                 const SizedBox(width: 6),
                 Text(sale.customerName, style: const TextStyle(fontWeight: FontWeight.bold)),
                 if (sale.customerPhone != null) ...[
@@ -106,7 +106,7 @@ void showInvoicePreview(BuildContext context, Sale sale, {required bool isAdmin}
               decoration: BoxDecoration(color: Colors.grey.shade100, borderRadius: BorderRadius.circular(10)),
               child: Row(
                 children: [
-                  const Icon(Icons.payments_outlined, size: 16, color: AppTheme.primary),
+                  Icon(Icons.payments_outlined, size: 16, color: Theme.of(context).colorScheme.primary),
                   const SizedBox(width: 8),
                   Text('পেমেন্ট মাধ্যম: ${kPaymentMethodLabels[sale.paymentMethod] ?? sale.paymentMethod}',
                       style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),

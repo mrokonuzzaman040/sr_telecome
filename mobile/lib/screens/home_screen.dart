@@ -142,11 +142,11 @@ class _HomeScreenState extends State<HomeScreen> {
                     minWidth: 76,
                     minExtendedWidth: 190,
                     backgroundColor: Colors.white,
-                    indicatorColor: AppTheme.primary.withValues(alpha: 0.12),
-                    selectedIconTheme: const IconThemeData(color: AppTheme.primary, size: 24),
+                    indicatorColor: Theme.of(context).colorScheme.primary.withValues(alpha: 0.12),
+                    selectedIconTheme: IconThemeData(color: Theme.of(context).colorScheme.primary, size: 24),
                     unselectedIconTheme: const IconThemeData(color: AppTheme.textMuted, size: 24),
-                    selectedLabelTextStyle: const TextStyle(
-                      color: AppTheme.primary,
+                    selectedLabelTextStyle: TextStyle(
+                      color: Theme.of(context).colorScheme.primary,
                       fontSize: 12,
                       fontWeight: FontWeight.bold,
                     ),
@@ -161,7 +161,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         width: 44,
                         height: 44,
                         decoration: BoxDecoration(
-                          color: AppTheme.primary,
+                          color: Theme.of(context).colorScheme.primary,
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: const Icon(Icons.menu_book_rounded, color: Colors.white, size: 24),
@@ -243,7 +243,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 children: List.generate(destinations.length, (index) {
                   final d = destinations[index];
                   final isSelected = _currentIndex == index;
-                  final color = isSelected ? AppTheme.primary : AppTheme.textMuted;
+                  final color = isSelected ? Theme.of(context).colorScheme.primary : AppTheme.textMuted;
 
                   final icon = Icon(
                     isSelected ? d.selectedIcon : d.icon,
@@ -260,8 +260,8 @@ class _HomeScreenState extends State<HomeScreen> {
                         color: Colors.transparent,
                         child: InkWell(
                           onTap: () => _onTabSelected(index),
-                          splashColor: AppTheme.primary.withValues(alpha: 0.1),
-                          highlightColor: AppTheme.primary.withValues(alpha: 0.05),
+                          splashColor: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
+                          highlightColor: Theme.of(context).colorScheme.primary.withValues(alpha: 0.05),
                           child: Padding(
                             padding: EdgeInsets.symmetric(
                               vertical: verticalPadding,
@@ -281,7 +281,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                   ),
                                   decoration: BoxDecoration(
                                     color: isSelected
-                                        ? AppTheme.primary.withValues(alpha: 0.12)
+                                        ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.12)
                                         : Colors.transparent,
                                     borderRadius: BorderRadius.circular(16),
                                   ),

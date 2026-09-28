@@ -131,7 +131,7 @@ class _PosScreenState extends State<PosScreen> {
                 const SizedBox(width: 8),
                 IconButton.filled(
                   style: IconButton.styleFrom(
-                    backgroundColor: AppTheme.primary,
+                    backgroundColor: Theme.of(context).colorScheme.primary,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   ),
                   icon: const Icon(Icons.qr_code_scanner, color: Colors.white),
@@ -221,14 +221,14 @@ class _PosScreenState extends State<PosScreen> {
                                         const SizedBox(height: 8),
                                         Text(
                                           '\u09f3${currencyFormat.format(product.mrp)}',
-                                          style: const TextStyle(fontWeight: FontWeight.w800, color: AppTheme.primary, fontSize: 15.5),
+                                          style: TextStyle(fontWeight: FontWeight.w800, color: Theme.of(context).colorScheme.primary, fontSize: 15.5),
                                         ),
                                       ],
                                     ),
                                   ),
                                   const SizedBox(width: 8),
                                   IconButton.filled(
-                                    style: IconButton.styleFrom(backgroundColor: AppTheme.primary),
+                                    style: IconButton.styleFrom(backgroundColor: Theme.of(context).colorScheme.primary),
                                     icon: const Icon(Icons.add_shopping_cart, size: 20),
                                     onPressed: () {
                                       store.addToCart(product);
@@ -315,10 +315,10 @@ class _PosScreenState extends State<PosScreen> {
       child: FilterChip(
         selected: isSelected,
         label: Text(label),
-        selectedColor: AppTheme.primary.withValues(alpha: 0.15),
-        checkmarkColor: AppTheme.primary,
+        selectedColor: Theme.of(context).colorScheme.primary.withValues(alpha: 0.15),
+        checkmarkColor: Theme.of(context).colorScheme.primary,
         labelStyle: TextStyle(
-          color: isSelected ? AppTheme.primary : Colors.black87,
+          color: isSelected ? Theme.of(context).colorScheme.primary : Colors.black87,
           fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
         ),
         onSelected: (_) {

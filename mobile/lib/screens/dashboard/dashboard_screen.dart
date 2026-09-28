@@ -77,8 +77,8 @@ class DashboardScreen extends StatelessWidget {
         child: CustomScrollView(
           slivers: [
             if (isLoading)
-              const SliverToBoxAdapter(
-                child: LinearProgressIndicator(minHeight: 2, color: AppTheme.primaryLight),
+              SliverToBoxAdapter(
+                child: LinearProgressIndicator(minHeight: 2, color: Theme.of(context).colorScheme.primary),
               ),
             if (errorMessage != null)
               SliverToBoxAdapter(
@@ -124,9 +124,16 @@ class DashboardScreen extends StatelessWidget {
               child: Container(
                 width: double.infinity,
                 padding: const EdgeInsets.fromLTRB(20, 56, 20, 28),
-                decoration: const BoxDecoration(
-                  gradient: AppTheme.primaryGradient,
-                  borderRadius: BorderRadius.only(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      Theme.of(context).colorScheme.primary,
+                      Theme.of(context).colorScheme.primary.withValues(alpha: 0.7),
+                    ],
+                  ),
+                  borderRadius: const BorderRadius.only(
                     bottomLeft: Radius.circular(28),
                     bottomRight: Radius.circular(28),
                   ),
@@ -328,10 +335,10 @@ class DashboardScreen extends StatelessWidget {
                                 Container(
                                   padding: const EdgeInsets.all(8),
                                   decoration: BoxDecoration(
-                                    color: AppTheme.primary.withValues(alpha: 0.1),
+                                    color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
                                     borderRadius: BorderRadius.circular(10),
                                   ),
-                                  child: const Icon(Icons.receipt, color: AppTheme.primary, size: 16),
+                                  child: Icon(Icons.receipt, color: Theme.of(context).colorScheme.primary, size: 16),
                                 ),
                                 const SizedBox(width: 12),
                                 Expanded(

@@ -261,12 +261,12 @@ class _CustomerScreenState extends State<CustomerScreen> {
                                       Container(
                                         padding: const EdgeInsets.all(10),
                                         decoration: BoxDecoration(
-                                          color: (customer.isAgent ? Colors.amber : AppTheme.primary).withValues(alpha: 0.12),
+                                          color: (customer.isAgent ? Colors.amber : Theme.of(context).colorScheme.primary).withValues(alpha: 0.12),
                                           borderRadius: BorderRadius.circular(12),
                                         ),
                                         child: Icon(
                                           customer.isAgent ? Icons.storefront : Icons.person,
-                                          color: customer.isAgent ? Colors.amber.shade800 : AppTheme.primary,
+                                          color: customer.isAgent ? Colors.amber.shade800 : Theme.of(context).colorScheme.primary,
                                           size: 20,
                                         ),
                                       ),
@@ -321,7 +321,7 @@ class _CustomerScreenState extends State<CustomerScreen> {
                                       Row(
                                         children: [
                                           IconButton.outlined(
-                                            icon: const Icon(Icons.call, size: 18, color: AppTheme.primary),
+                                            icon: Icon(Icons.call, size: 18, color: Theme.of(context).colorScheme.primary),
                                             onPressed: () => _callPhone(customer.phone),
                                           ),
                                           const SizedBox(width: 8),
@@ -331,7 +331,7 @@ class _CustomerScreenState extends State<CustomerScreen> {
                                           ),
                                           const SizedBox(width: 8),
                                           IconButton.outlined(
-                                            icon: const Icon(Icons.edit_outlined, size: 18, color: AppTheme.secondary),
+                                            icon: Icon(Icons.edit_outlined, size: 18, color: Theme.of(context).colorScheme.secondary),
                                             onPressed: () => Navigator.push(
                                               context,
                                               MaterialPageRoute(builder: (_) => CustomerFormScreen(customer: customer)),
@@ -371,10 +371,10 @@ class _CustomerScreenState extends State<CustomerScreen> {
       child: FilterChip(
         selected: isSelected,
         label: Text(label),
-        selectedColor: AppTheme.primary.withValues(alpha: 0.15),
-        checkmarkColor: AppTheme.primary,
+        selectedColor: Theme.of(context).colorScheme.primary.withValues(alpha: 0.15),
+        checkmarkColor: Theme.of(context).colorScheme.primary,
         labelStyle: TextStyle(
-          color: isSelected ? AppTheme.primary : Colors.black87,
+          color: isSelected ? Theme.of(context).colorScheme.primary : Colors.black87,
           fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
         ),
         onSelected: (_) => setState(() => _typeFilter = key),

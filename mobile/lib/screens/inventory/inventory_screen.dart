@@ -120,7 +120,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                     label: 'মোট পণ্য',
                     value: '${products.length} টি',
                     icon: Icons.inventory_2_outlined,
-                    color: AppTheme.primary,
+                    color: Theme.of(context).colorScheme.primary,
                   ),
                 ),
                 const SizedBox(width: 10),
@@ -281,7 +281,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                                             children: [
                                               Text(
                                                 '\u09f3${currencyFormat.format(product.mrp)}',
-                                                style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16, color: AppTheme.primary),
+                                                style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16, color: Theme.of(context).colorScheme.primary),
                                               ),
                                               if (isAdmin)
                                                 Text(
@@ -314,10 +314,10 @@ class _InventoryScreenState extends State<InventoryScreen> {
       child: FilterChip(
         selected: isSelected,
         label: Text(label),
-        selectedColor: AppTheme.primary.withValues(alpha: 0.15),
-        checkmarkColor: AppTheme.primary,
+        selectedColor: Theme.of(context).colorScheme.primary.withValues(alpha: 0.15),
+        checkmarkColor: Theme.of(context).colorScheme.primary,
         labelStyle: TextStyle(
-          color: isSelected ? AppTheme.primary : Colors.black87,
+          color: isSelected ? Theme.of(context).colorScheme.primary : Colors.black87,
           fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
         ),
         onSelected: (_) => setState(() => _categoryFilter = key),
@@ -335,9 +335,9 @@ class _InventoryScreenState extends State<InventoryScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10),
       decoration: BoxDecoration(
-        color: isActive ? AppTheme.primary.withValues(alpha: 0.1) : Colors.grey.shade100,
+        color: isActive ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.1) : Colors.grey.shade100,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: isActive ? AppTheme.primary : Colors.grey.shade300),
+        border: Border.all(color: isActive ? Theme.of(context).colorScheme.primary : Colors.grey.shade300),
       ),
       child: DropdownButtonHideUnderline(
         child: DropdownButton<String>(
@@ -346,7 +346,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
           icon: const Icon(Icons.arrow_drop_down, size: 18),
           style: TextStyle(
             fontSize: 13,
-            color: isActive ? AppTheme.primary : Colors.black87,
+            color: isActive ? Theme.of(context).colorScheme.primary : Colors.black87,
             fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
           ),
           items: [

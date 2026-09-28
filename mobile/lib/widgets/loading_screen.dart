@@ -19,9 +19,9 @@ class LoadingScreen extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(18),
               decoration: BoxDecoration(
-                color: AppTheme.primary.withValues(alpha: 0.2),
+                color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.2),
                 shape: BoxShape.circle,
-                border: Border.all(color: AppTheme.primary, width: 2),
+                border: Border.all(color: Theme.of(context).colorScheme.primary, width: 2),
               ),
               child: const Icon(
                 Icons.menu_book_rounded,

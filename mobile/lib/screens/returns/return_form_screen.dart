@@ -146,7 +146,7 @@ class _ReturnFormScreenState extends State<ReturnFormScreen> {
                         ),
                       ),
                       IconButton(
-                        icon: const Icon(Icons.qr_code_scanner, color: AppTheme.primary),
+                        icon: Icon(Icons.qr_code_scanner, color: Theme.of(context).colorScheme.primary),
                         onPressed: () async {
                           final barcode = await Navigator.push<String>(
                             context,
@@ -532,11 +532,11 @@ class _ReturnFormScreenState extends State<ReturnFormScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Row(
+                Row(
                   children: [
-                    Icon(Icons.person_pin, size: 18, color: AppTheme.primary),
-                    SizedBox(width: 6),
-                    Text('গ্রাহক ও মূল চালান তথ্য', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                    Icon(Icons.person_pin, size: 18, color: Theme.of(context).colorScheme.primary),
+                    const SizedBox(width: 6),
+                    const Text('গ্রাহক ও মূল চালান তথ্য', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
                   ],
                 ),
                 const SizedBox(height: 10),
@@ -618,7 +618,7 @@ class _ReturnFormScreenState extends State<ReturnFormScreen> {
                                 ),
                                 ElevatedButton(
                                   style: ElevatedButton.styleFrom(
-                                    backgroundColor: alreadyAdded ? Colors.grey : AppTheme.primary,
+                                    backgroundColor: alreadyAdded ? Colors.grey : Theme.of(context).colorScheme.primary,
                                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                                     minimumSize: const Size(60, 28),
                                   ),
@@ -679,7 +679,7 @@ class _ReturnFormScreenState extends State<ReturnFormScreen> {
                     return ChoiceChip(
                       label: Text(r, style: TextStyle(fontSize: 11, color: isSel ? Colors.white : Colors.black87)),
                       selected: isSel,
-                      selectedColor: AppTheme.primary,
+                      selectedColor: Theme.of(context).colorScheme.primary,
                       onSelected: (val) {
                         if (val) setState(() => _reasonController.text = r);
                       },
@@ -825,7 +825,7 @@ class _ReturnFormScreenState extends State<ReturnFormScreen> {
                                     style: TextStyle(fontSize: 11, color: Colors.grey.shade700),
                                   ),
                                   const SizedBox(width: 4),
-                                  const Icon(Icons.edit, size: 12, color: AppTheme.primary),
+                                  Icon(Icons.edit, size: 12, color: Theme.of(context).colorScheme.primary),
                                 ],
                               ),
                             ),
@@ -841,7 +841,7 @@ class _ReturnFormScreenState extends State<ReturnFormScreen> {
                           ),
                           Text('${item.quantity}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
                           IconButton(
-                            icon: const Icon(Icons.add_circle_outline, size: 20, color: AppTheme.primary),
+                            icon: Icon(Icons.add_circle_outline, size: 20, color: Theme.of(context).colorScheme.primary),
                             onPressed: () => _updateItemQuantity(list, index, 1),
                           ),
                         ],

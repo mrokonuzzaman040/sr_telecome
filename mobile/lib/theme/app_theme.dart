@@ -35,12 +35,6 @@ class AppTheme {
     ),
   ];
 
-  static const LinearGradient primaryGradient = LinearGradient(
-    begin: Alignment.topLeft,
-    end: Alignment.bottomRight,
-    colors: [primary, Color(0xFF0D9488)],
-  );
-
   static ThemeData lightTheme = buildThemeWithColor(primary, primaryDark, primaryLight);
 
   /// Build a ThemeData with a dynamic primary color. Used by ThemeProvider.
@@ -58,6 +52,15 @@ class AppTheme {
         surface: cardLight,
         brightness: Brightness.light,
       ),
+      extensions: [
+        _AppThemeExtension(
+          primaryGradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [primaryColor, primaryLightColor],
+          ),
+        ),
+      ],
       scaffoldBackgroundColor: backgroundLight,
       textTheme: GoogleFonts.hindSiliguriTextTheme().apply(
         bodyColor: textDark,
@@ -133,6 +136,35 @@ class AppTheme {
         ),
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       ),
+    );
+  }
+}
+
+/// Theme extension for custom theme properties like gradients
+@immutable
+class _AppThemeExtension extends ThemeExtension<_AppThemeExtension> {
+  final LinearGradient primaryGradient;
+
+  const _AppThemeExtension({
+    required this.primaryGradient,
+  });
+
+  @override
+  _AppThemeExtension copyWith({
+    LinearGradient? primaryGradient,
+  }) {
+    return _AppThemeExtension(
+      primaryGradient: primaryGradient ?? this.primaryGradient,
+    );
+  }
+
+  @override
+  _AppThemeExtension lerp(ThemeExtension<_AppThemeExtension>? other, double t) {
+    if (other is! _AppThemeExtension) {
+      return this;
+    }
+    return _AppThemeExtension(
+      primaryGradient: LinearGradient.lerp(primaryGradient, other.primaryGradient, t)!,
     );
   }
 }

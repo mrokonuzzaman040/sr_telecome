@@ -291,7 +291,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
                       (
                         title: 'মোট বিক্রয় (বিক্রিত মূল্য)',
                         amount: totalSalesAmount,
-                        color: AppTheme.primary,
+                        color: Theme.of(context).colorScheme.primary,
                         icon: Icons.point_of_sale,
                       ),
                       (

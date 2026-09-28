@@ -185,7 +185,7 @@ class _CartModalState extends State<CartModal> {
               children: [
                 Row(
                   children: [
-                    const Icon(Icons.shopping_bag_outlined, color: AppTheme.primary),
+                    Icon(Icons.shopping_bag_outlined, color: Theme.of(context).colorScheme.primary),
                     const SizedBox(width: 8),
                     Text(
                       'কার্ট তালিকা (${store.cartTotalQuantity} টি)',
@@ -480,7 +480,7 @@ class _CartModalState extends State<CartModal> {
                                           style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
                                         ),
                                         const SizedBox(width: 4),
-                                        const Icon(Icons.edit_note, size: 14, color: AppTheme.primary),
+                                        Icon(Icons.edit_note, size: 14, color: Theme.of(context).colorScheme.primary),
                                       ],
                                     ),
                                   ],
@@ -502,7 +502,7 @@ class _CartModalState extends State<CartModal> {
                                   style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
                                 ),
                                 IconButton(
-                                  icon: const Icon(Icons.add_circle_outline, size: 22, color: AppTheme.primary),
+                                  icon: Icon(Icons.add_circle_outline, size: 22, color: Theme.of(context).colorScheme.primary),
                                   onPressed: () {
                                     store.updateCartItemQty(item.productId, item.quantity + 1);
                                     _syncPaidController();
@@ -566,7 +566,7 @@ class _CartModalState extends State<CartModal> {
                     const Text('পরিশোধযোগ্য মূল্য:', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                     Text(
                       '৳${currencyFormat.format(store.cartPayable)}',
-                      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppTheme.primary),
+                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.primary),
                     ),
                   ],
                 ),
@@ -666,12 +666,12 @@ class _CartModalState extends State<CartModal> {
         label: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 16, color: isSelected ? Colors.white : AppTheme.primary),
+            Icon(icon, size: 16, color: isSelected ? Colors.white : Theme.of(context).colorScheme.primary),
             const SizedBox(width: 4),
             Text(label),
           ],
         ),
-        selectedColor: AppTheme.primary,
+        selectedColor: Theme.of(context).colorScheme.primary,
         labelStyle: TextStyle(color: isSelected ? Colors.white : Colors.black87),
         onSelected: (_) {
           store.setPaymentMethod(method);

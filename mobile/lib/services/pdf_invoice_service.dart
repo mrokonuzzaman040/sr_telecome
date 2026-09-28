@@ -620,8 +620,8 @@ void showPrintOptionsModal(
               children: [
                 Container(
                   padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(color: AppTheme.primary.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(12)),
-                  child: const Icon(Icons.print, color: AppTheme.primary, size: 24),
+                  decoration: BoxDecoration(color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(12)),
+                  child: Icon(Icons.print, color: Theme.of(context).colorScheme.primary, size: 24),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -652,16 +652,16 @@ void showPrintOptionsModal(
               child: Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  border: Border.all(color: AppTheme.primary.withValues(alpha: 0.3)),
+                  border: Border.all(color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.3)),
                   borderRadius: BorderRadius.circular(16),
-                  color: AppTheme.primary.withValues(alpha: 0.04),
+                  color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.04),
                 ),
                 child: Row(
                   children: [
                     Container(
                       padding: const EdgeInsets.all(10),
                       decoration: BoxDecoration(
-                        color: AppTheme.primary,
+                        color: Theme.of(context).colorScheme.primary,
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: const Icon(Icons.print, color: Colors.white, size: 22),
@@ -677,7 +677,7 @@ void showPrintOptionsModal(
                         ],
                       ),
                     ),
-                    const Icon(Icons.arrow_forward_ios, size: 16, color: AppTheme.primary),
+                    Icon(Icons.arrow_forward_ios, size: 16, color: Theme.of(context).colorScheme.primary),
                   ],
                 ),
               ),
