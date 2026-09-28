@@ -138,6 +138,8 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const [dailyBackups, setDailyBackups] = useState<DailyBackup[]>([]);
   const [selectedDate, setSelectedDate] = useState<string>(getTodayDateString());
 
+  const resetSelectedDate = () => setSelectedDate(getTodayDateString());
+
   const syncLiveStoreData = useCallback((userRole?: string) => {
     const fetchPromises = [
       fetch("/api/products").then((r) => (r.ok ? r.json() : null)),
@@ -308,70 +310,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setIsHydrated(true);
     }
-  }, []);
-
-  const syncLiveStoreData = useCallback((userRole?: string) => {
-    const fetchPromises = [
-      fetch("/api/products").then((r) => (r.ok ? r.json() : null)),
-      fetch("/api/customers").then((r) => (r.ok ? r.json() : null)),
-      fetch("/api/sales").then((r) => (r.ok ? r.json() : null)),
-      fetch("/api/returns").then((r) => (r.ok ? r.json() : null)),
-      fetch("/api/due-payments").then((r) => (r.ok ? r.json() : null)),
-      fetch("/api/expenses").then((r) => (r.ok ? r.json() : null)),
-      fetch("/api/publishers").then((r) => (r.ok ? r.json() : null)),
-    ];
-
-    if (userRole === "admin") {
-      fetchPromises.push(
-        fetch("/api/backups").then((r) => (r.ok ? r.json() : null))
-      );
-    }
-
-    Promise.allSettled(fetchPromises).then(([pRes, cRes, sRes, rRes, dRes, eRes, pubRes, bkpRes]) => {
-      if (pRes?.status === "fulfilled" && Array.isArray(pRes.value) && pRes.value.length > 0) {
-        setProducts(pRes.value);
-      }
-      if (cRes?.status === "fulfilled" && Array.isArray(cRes.value) && cRes.value.length > 0) {
-        setCustomers(cRes.value);
-      }
-      if (sRes?.status === "fulfilled" && Array.isArray(sRes.value)) {
-        setSales(sRes.value);
-      }
-      if (rRes?.status === "fulfilled" && Array.isArray(rRes.value)) {
-        setReturns(rRes.value);
-      }
-      if (dRes?.status === "fulfilled" && Array.isArray(dRes.value)) {
-        setDuePayments(dRes.value);
-      }
-      if (eRes?.status === "fulfilled" && Array.isArray(eRes.value)) {
-        setExpenses(eRes.value);
-      }
-      if (pubRes?.status === "fulfilled" && Array.isArray(pubRes.value) && pubRes.value.length > 0) {
-        setPublishers(pubRes.value);
-      }
-      if (bkpRes && bkpRes.status === "fulfilled" && Array.isArray(bkpRes.value)) {
-        setDailyBackups(bkpRes.value);
-      }
-
-      // If admin, trigger daily auto-backup to Supabase silently
-      if (userRole === "admin") {
-        fetch("/api/backups", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ backupType: "auto_daily" }),
-        })
-          .then((res) => res.json())
-          .then((data) => {
-            if (data?.backup) {
-              setDailyBackups((prev) => [data.backup, ...prev.filter((b) => b.id !== data.backup.id)]);
-            }
-          })
-          .catch(() => {});
-      }
-    }).catch((err) => {
-      console.warn("Live store sync fallback:", err);
-    });
-  }, []);
+  }, [syncLiveStoreData]);
 
   // Save to LocalStorage whenever state changes
   useEffect(() => {

@@ -41,12 +41,17 @@ This application is ready to connect directly to **Neon Serverless Postgres** or
 
 ### Role-Based Access Control (Security System)
 
-| Role | Username | Default PIN | Permissions |
+| Role | Username | Initial Default PIN | Permissions |
 | :--- | :--- | :--- | :--- |
-| **Proprietor / Admin (মালিক)** | `admin` | **`1234`** | **Full Access**: All financial reports, Net Profit/Loss, Cost prices (COGS), Stock additions, Shop settings, Full JSON backup/restore. |
-| **Cashier / Staff (বিক্রয়কর্মী)** | `cashier` | **`5678`** | **Sales & POS**: POS billing, Thermal/A4 print, Stock inventory check, Customer due collection, Returns & Exchange.<br>*(Restricted from viewing profit/loss margins and system configuration)* |
+| **Proprietor / Admin (মালিক)** | `admin` | **`1234`** *(Must change in Settings)* | **Full Access**: All financial reports, Net Profit/Loss, Cost prices (COGS), Stock additions, Shop settings, Full JSON backup/restore. |
+| **Cashier / Staff (বিক্রয়কর্মী)** | `cashier` | **`5678`** *(Must change in Settings)* | **Sales & POS**: POS billing, Thermal/A4 print, Stock inventory check, Customer due collection, Returns & Exchange.<br>*(Restricted from viewing profit/loss margins and system configuration)* |
 
-> **Security Guard**:
-> When a cashier tries to access the Profit & Loss Reports or Settings tabs, the software renders:
-> `"Access Restricted: This section requires Proprietor/Admin authentication."`
-> with an instant Admin PIN unlock form so the owner can view reports without forcing a full logout.
+> **Production Security Hardening (Going Public)**:
+> 1. **Immediate PIN Change**: Prior to sharing the public URL, log in as `admin` and navigate to **Settings** -> **Security & PIN Management** to change both the Admin PIN and the Staff PIN. All PINs are hashed using salted **PBKDF2**.
+> 2. **Session Security**: Authenticated sessions are sealed with cryptographic **HMAC-SHA256** session tokens stored in `HttpOnly`, `SameSite=Lax`, `Secure` cookies (Web) and Bearer tokens (Mobile).
+> 3. **Server-Side RBAC Enforcement**:
+>    - `/api/backups`: Restricted exclusively to `admin`.
+>    - Product, publisher, and expense deletion: Restricted exclusively to `admin`.
+>    - `/api/sales`: Automatically redacts purchase cost and gross profit for staff users.
+> 4. **Rate Limiting & Brute-Force Defense**: `/api/auth/login` throttles failed attempts to 5 per 5 minutes per IP.
+> 5. **Security Headers**: HSTS, CSP, X-Frame-Options (DENY), and X-Content-Type-Options (nosniff) are enforced via `next.config.ts`.
