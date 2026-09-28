@@ -37,9 +37,11 @@ if (cleanConnectionString) {
     global._pgPool = new Pool({
       connectionString: cleanConnectionString,
       ssl: { rejectUnauthorized: false },
-      max: 10,
+      max: 50, // Increased from 10 to 50 to handle mobile app auto-refresh
+      min: 5,  // Keep minimum 5 connections ready
       idleTimeoutMillis: 30000,
-      connectionTimeoutMillis: 5000,
+      connectionTimeoutMillis: 10000, // Increased timeout
+      maxUses: 7500, // Recycle connections after 7500 uses
     });
   }
   pool = global._pgPool;

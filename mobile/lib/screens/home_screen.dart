@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -45,8 +46,16 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      Provider.of<StoreProvider>(context, listen: false).loadAllData();
+      final store = Provider.of<StoreProvider>(context, listen: false);
+      store.loadAllData();
+      store.startAutoRefresh(); // Start auto-refresh
     });
+  }
+
+  @override
+  void dispose() {
+    Provider.of<StoreProvider>(context, listen: false).stopAutoRefresh();
+    super.dispose();
   }
 
   void _onTabSelected(int index) {

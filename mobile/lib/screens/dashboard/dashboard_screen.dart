@@ -1,4 +1,6 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import '../../providers/store_provider.dart';
@@ -11,16 +13,45 @@ import '../../widgets/status_badge.dart';
 import '../../widgets/invoice_preview_sheet.dart';
 import '../invoices/invoices_list_screen.dart';
 
-class DashboardScreen extends StatelessWidget {
+class DashboardScreen extends StatefulWidget {
   final void Function(int tabIndex)? onNavigate;
 
   const DashboardScreen({super.key, this.onNavigate});
 
+  @override
+  State<DashboardScreen> createState() => _DashboardScreenState();
+}
+
+class _DashboardScreenState extends State<DashboardScreen> {
+  Timer? _refreshTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    // Auto-refresh dashboard data every 2 minutes (to reduce DB load)
+    _refreshTimer = Timer.periodic(const Duration(minutes: 2), (_) {
+      if (mounted) {
+        final store = Provider.of<StoreProvider>(context, listen: false);
+        store.loadAllData();
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _refreshTimer?.cancel();
+    super.dispose();
+  }
+
   bool _isToday(String isoDate) {
     try {
-      final d = DateTime.parse(isoDate);
+      // Parse UTC date and convert to local time (device should be in BD timezone)
+      final d = DateTime.parse(isoDate).toLocal();
       final now = DateTime.now();
-      return d.year == now.year && d.month == now.month && d.day == now.day;
+      
+      final isToday = d.year == now.year && d.month == now.month && d.day == now.day;
+      debugPrint('📅 Date check: $isoDate -> Local: $d -> Today: $now -> Match: $isToday');
+      return isToday;
     } catch (_) {
       return false;
     }
@@ -179,7 +210,9 @@ class DashboardScreen extends StatelessWidget {
                                 )
                               : const Icon(Icons.refresh, color: Colors.white),
                           tooltip: 'তথ্য রিফ্রেশ করুন',
-                          onPressed: isLoading ? null : () => store.loadAllData(),
+                          onPressed: isLoading ? null : () {
+                            store.loadAllData();
+                          },
                         ),
                       ],
                     ),
@@ -246,14 +279,14 @@ class DashboardScreen extends StatelessWidget {
                         value: '৳${currency.format(totalDue)}',
                         icon: Icons.receipt_long,
                         color: AppTheme.danger,
-                        onTap: () => onNavigate?.call(3),
+                        onTap: () => widget.onNavigate?.call(3),
                       ),
                       StatCard(
                         label: 'কম স্টক পণ্য',
                         value: '$lowStockCount টি',
                         icon: Icons.warning_amber,
                         color: AppTheme.danger,
-                        onTap: () => onNavigate?.call(2),
+                        onTap: () => widget.onNavigate?.call(2),
                       ),
                       StatCard(label: 'গড় বিক্রয় মূল্য', value: '৳${currency.format(avgOrderValue)}', icon: Icons.shopping_bag_outlined, color: Colors.purple),
                       if (auth.isAdmin)
@@ -348,7 +381,7 @@ class DashboardScreen extends StatelessWidget {
                                       Text(sale.invoiceNo, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
                                       const SizedBox(height: 2),
                                       Text(
-                                        '${sale.customerName} · ${sale.createdAt.split('T').first}',
+                                        '${sale.customerName} · ${DateTime.parse(sale.createdAt).toLocal().toString().split(' ')[0]}',
                                         style: const TextStyle(fontSize: 11.5, color: AppTheme.textMuted),
                                         maxLines: 1,
                                         overflow: TextOverflow.ellipsis,

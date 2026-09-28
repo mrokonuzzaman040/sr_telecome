@@ -1,9 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query } from "@/lib/db";
 import { verifyAuth } from "@/lib/auth";
+import { checkRateLimit, getClientIp } from "@/lib/rateLimit";
 
 export async function GET(req: NextRequest) {
   try {
+    // Rate limiting for mobile app data fetching
+    const ip = getClientIp(req);
+    const rateLimitResult = checkRateLimit(`products:${ip}`, 60, 60); // 60 requests per minute
+    
+    if (!rateLimitResult.allowed) {
+      return NextResponse.json(
+        { error: "Too many requests", retryAfter: rateLimitResult.retryAfterSeconds },
+        { status: 429, headers: { 'Retry-After': rateLimitResult.retryAfterSeconds.toString() } }
+      );
+    }
+
     const auth = await verifyAuth(req);
     if (!auth.success) return auth.response;
 

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -21,6 +22,10 @@ class StoreProvider extends ChangeNotifier {
   String? _errorMessage;
   bool _isOffline = false;
   bool _isSessionExpired = false;
+  
+  // Auto-refresh timer
+  Timer? _autoRefreshTimer;
+  static const Duration _autoRefreshInterval = Duration(minutes: 2); // Refresh every 2 minutes to reduce DB load
 
   // Bumped only when the matching list actually changes (load / create /
   // update / stock or due adjustment) - lets screens use context.select on a
@@ -39,6 +44,28 @@ class StoreProvider extends ChangeNotifier {
   int get expensesVersion => _expensesVersion;
   int get publishersVersion => _publishersVersion;
   int get returnsVersion => _returnsVersion;
+
+  // Auto-refresh methods
+  void startAutoRefresh() {
+    _autoRefreshTimer?.cancel();
+    _autoRefreshTimer = Timer.periodic(_autoRefreshInterval, (_) {
+      debugPrint('🔄 Auto-refreshing data from server...');
+      loadAllData();
+    });
+    debugPrint('✅ Auto-refresh started (every ${_autoRefreshInterval.inSeconds} seconds)');
+  }
+
+  void stopAutoRefresh() {
+    _autoRefreshTimer?.cancel();
+    _autoRefreshTimer = null;
+    debugPrint('⏹️ Auto-refresh stopped');
+  }
+
+  @override
+  void dispose() {
+    stopAutoRefresh();
+    super.dispose();
+  }
 
   // Cart State for POS
   final List<SaleItem> _cart = [];
@@ -163,6 +190,7 @@ class StoreProvider extends ChangeNotifier {
   }
 
   Future<void> loadAllData() async {
+    debugPrint('📡 Starting data load from server...');
     _isLoading = true;
     _errorMessage = null;
     _isSessionExpired = false;
@@ -220,6 +248,8 @@ class StoreProvider extends ChangeNotifier {
       final fetchedPublishers = results[4] as List<Publisher>;
       final fetchedReturns = results[5] as List<ReturnRecord>;
 
+      debugPrint('📦 Fetched: ${fetchedSales.length} sales, ${fetchedProducts.length} products, ${fetchedCustomers.length} customers');
+
       if (fetchedProducts.isNotEmpty || _products.isEmpty) {
         _products = fetchedProducts;
         _productsVersion++;
@@ -255,7 +285,9 @@ class StoreProvider extends ChangeNotifier {
         _errorMessage = null;
         await _saveOfflineCache();
       }
+      debugPrint('✅ Data load completed successfully');
     } catch (e) {
+      debugPrint('❌ Data load failed: $e');
       if (e is AuthRequiredException) {
         _isSessionExpired = true;
         _errorMessage = 'লগইন সেশনের মেয়াদ শেষ। পুনরায় লগইন করুন।';
