@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -48,13 +47,11 @@ class _HomeScreenState extends State<HomeScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final store = Provider.of<StoreProvider>(context, listen: false);
       store.loadAllData();
-      store.startAutoRefresh(); // Start auto-refresh
     });
   }
 
   @override
   void dispose() {
-    Provider.of<StoreProvider>(context, listen: false).stopAutoRefresh();
     super.dispose();
   }
 

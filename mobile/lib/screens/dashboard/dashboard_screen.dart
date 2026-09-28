@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:provider/provider.dart';
@@ -23,26 +22,6 @@ class DashboardScreen extends StatefulWidget {
 }
 
 class _DashboardScreenState extends State<DashboardScreen> {
-  Timer? _refreshTimer;
-
-  @override
-  void initState() {
-    super.initState();
-    // Auto-refresh dashboard data every 2 minutes (to reduce DB load)
-    _refreshTimer = Timer.periodic(const Duration(minutes: 2), (_) {
-      if (mounted) {
-        final store = Provider.of<StoreProvider>(context, listen: false);
-        store.loadAllData();
-      }
-    });
-  }
-
-  @override
-  void dispose() {
-    _refreshTimer?.cancel();
-    super.dispose();
-  }
-
   bool _isToday(String isoDate) {
     try {
       // Parse UTC date and convert to local time (device should be in BD timezone)
@@ -209,7 +188,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                   child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                                 )
                               : const Icon(Icons.refresh, color: Colors.white),
-                          tooltip: 'তথ্য রিফ্রেশ করুন',
+                          tooltip: 'Pull to refresh or tap to reload data',
                           onPressed: isLoading ? null : () {
                             store.loadAllData();
                           },
