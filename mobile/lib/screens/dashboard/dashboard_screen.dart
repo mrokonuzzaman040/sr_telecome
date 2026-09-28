@@ -8,6 +8,7 @@ import '../../widgets/stat_card.dart';
 import '../../widgets/section_header.dart';
 import '../../widgets/empty_state.dart';
 import '../../widgets/status_badge.dart';
+import '../../widgets/invoice_preview_sheet.dart';
 import '../invoices/invoices_list_screen.dart';
 
 class DashboardScreen extends StatelessWidget {
@@ -39,6 +40,8 @@ class DashboardScreen extends StatelessWidget {
     context.select<StoreProvider, int>((s) => s.expensesVersion);
     context.select<StoreProvider, int>((s) => s.customersVersion);
     context.select<StoreProvider, int>((s) => s.productsVersion);
+    final isLoading = context.select<StoreProvider, bool>((s) => s.isLoading);
+    final errorMessage = context.select<StoreProvider, String?>((s) => s.errorMessage);
     final store = context.read<StoreProvider>();
     final auth = Provider.of<AuthProvider>(context);
     final currency = NumberFormat('#,##0', 'en_US');
@@ -73,6 +76,50 @@ class DashboardScreen extends StatelessWidget {
         onRefresh: () => store.loadAllData(),
         child: CustomScrollView(
           slivers: [
+            if (isLoading)
+              const SliverToBoxAdapter(
+                child: LinearProgressIndicator(minHeight: 2, color: AppTheme.primaryLight),
+              ),
+            if (errorMessage != null)
+              SliverToBoxAdapter(
+                child: Container(
+                  width: double.infinity,
+                  margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.amber.shade50,
+                    borderRadius: BorderRadius.circular(AppTheme.radiusSm),
+                    border: Border.all(color: Colors.amber.shade300),
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(Icons.wifi_off_rounded, color: Colors.amber.shade800, size: 20),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              errorMessage,
+                              style: TextStyle(fontSize: 12.5, color: Colors.amber.shade900, fontWeight: FontWeight.w600),
+                            ),
+                            const SizedBox(height: 2),
+                            const Text(
+                              'নিচের তথ্য শেষ সফল সিঙ্কের সময়কার হতে পারে।',
+                              style: TextStyle(fontSize: 11, color: AppTheme.textMuted),
+                            ),
+                          ],
+                        ),
+                      ),
+                      TextButton(
+                        onPressed: () => store.loadAllData(),
+                        child: const Text('পুনরায় চেষ্টা করুন', style: TextStyle(fontSize: 12)),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
             SliverToBoxAdapter(
               child: Container(
                 width: double.infinity,
@@ -117,8 +164,15 @@ class DashboardScreen extends StatelessWidget {
                           ),
                         ),
                         IconButton(
-                          icon: const Icon(Icons.refresh, color: Colors.white),
-                          onPressed: () => store.loadAllData(),
+                          icon: isLoading
+                              ? const SizedBox(
+                                  width: 18,
+                                  height: 18,
+                                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                                )
+                              : const Icon(Icons.refresh, color: Colors.white),
+                          tooltip: 'তথ্য রিফ্রেশ করুন',
+                          onPressed: isLoading ? null : () => store.loadAllData(),
                         ),
                       ],
                     ),
@@ -274,7 +328,9 @@ class DashboardScreen extends StatelessWidget {
                         children: recentSales.asMap().entries.map((entry) {
                           final sale = entry.value;
                           final isLast = entry.key == recentSales.length - 1;
-                          return Container(
+                          return InkWell(
+                            onTap: () => showInvoicePreview(context, sale, isAdmin: auth.isAdmin),
+                            child: Container(
                             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                             decoration: BoxDecoration(
                               border: isLast ? null : const Border(bottom: BorderSide(color: AppTheme.border)),
@@ -310,6 +366,7 @@ class DashboardScreen extends StatelessWidget {
                                   style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5, color: AppTheme.textDark),
                                 ),
                               ],
+                            ),
                             ),
                           );
                         }).toList(),

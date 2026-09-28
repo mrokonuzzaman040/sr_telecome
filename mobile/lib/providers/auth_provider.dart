@@ -33,20 +33,29 @@ class AuthProvider extends ChangeNotifier {
   Future<void> _loadUserSession() async {
     final prefs = await SharedPreferences.getInstance();
     final userJson = prefs.getString(_userJsonKey);
+    final token = await ApiService.getToken();
     _biometricLockEnabled = prefs.getBool(_biometricLockKey) ?? false;
 
-    if (userJson != null) {
+    // A valid session requires BOTH the user JSON AND a stored session token
+    if (userJson != null && token != null && token.isNotEmpty) {
       try {
         _currentUser = AppUser.fromJson(jsonDecode(userJson) as Map<String, dynamic>);
-        // A restored (not freshly-logged-in) session starts locked if the
-        // user has biometric lock turned on.
         _isUnlocked = !_biometricLockEnabled;
       } catch (_) {
         _currentUser = null;
+        await ApiService.clearToken();
       }
+    } else {
+      _currentUser = null;
+      await ApiService.clearToken();
     }
     _isLoading = false;
     notifyListeners();
+  }
+
+  /// Called when an API request returns 401 Unauthorized
+  Future<void> handleSessionExpired() async {
+    await logout();
   }
 
   /// Authenticates against the real backend (`/api/auth/login`).

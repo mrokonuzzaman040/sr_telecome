@@ -163,7 +163,17 @@ export function InvoicesListView({ onSelectInvoice }: InvoicesListViewProps) {
                 filteredSales.map((sale) => (
                   <tr key={sale.id} className="hover:bg-slate-50/70 transition">
                     <td className="py-2.5 px-3 font-bold text-slate-900">
-                      {sale.invoiceNo}
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span>{sale.invoiceNo}</span>
+                        {sale.isModified && (
+                          <span
+                            className="text-[9px] px-1.5 py-0.2 bg-amber-100 text-amber-800 border border-amber-200 rounded font-normal font-sans"
+                            title={sale.modifiedReason || "Invoice modified"}
+                          >
+                            Modified
+                          </span>
+                        )}
+                      </div>
                     </td>
                     <td className="py-2.5 px-3 text-slate-500 font-sans text-[11px]">
                       {formatDateTime(sale.createdAt)}

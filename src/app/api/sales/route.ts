@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { query, pool } from "@/lib/db";
+import { query, pool, ensureInvoiceEnhancements } from "@/lib/db";
 import { SaleItem } from "@/types";
 import { verifyAuth } from "@/lib/auth";
 import { sendSalePushNotification } from "@/lib/fcm";
@@ -8,6 +8,8 @@ export async function GET(req: NextRequest) {
   try {
     const auth = await verifyAuth(req);
     if (!auth.success) return auth.response;
+
+    await ensureInvoiceEnhancements();
 
     const rows = await query(
       `SELECT id, invoice_no as "invoiceNo", customer_id as "customerId", 
@@ -22,7 +24,11 @@ export async function GET(req: NextRequest) {
               payment_details as "paymentDetails", 
               total_cost::numeric as "totalCost", 
               gross_profit::numeric as "grossProfit", 
-              status, notes, created_at as "createdAt"
+              status, notes, 
+              COALESCE(is_modified, false) as "isModified",
+              modified_at as "modifiedAt",
+              modified_reason as "modifiedReason",
+              created_at as "createdAt"
        FROM sales 
        ORDER BY created_at DESC`
     );
@@ -168,3 +174,76 @@ export async function POST(req: NextRequest) {
     client.release();
   }
 }
+
+export async function PATCH(req: NextRequest) {
+  try {
+    const auth = await verifyAuth(req);
+    if (!auth.success) return auth.response;
+
+    await ensureInvoiceEnhancements();
+
+    const body = await req.json();
+    const { id, invoiceNo, ...updates } = body;
+
+    if (!id && !invoiceNo) {
+      return NextResponse.json({ error: "Missing sale id or invoiceNo" }, { status: 400 });
+    }
+
+    const setClauses: string[] = [];
+    const values: any[] = [];
+    let idx = 1;
+
+    if (updates.paidAmount !== undefined) {
+      setClauses.push(`paid_amount = $${idx++}`);
+      values.push(Number(updates.paidAmount) || 0);
+    }
+    if (updates.dueAmount !== undefined) {
+      setClauses.push(`due_amount = $${idx++}`);
+      values.push(Number(updates.dueAmount) || 0);
+    }
+    if (updates.notes !== undefined) {
+      setClauses.push(`notes = $${idx++}`);
+      values.push(updates.notes);
+    }
+    if (updates.status !== undefined) {
+      setClauses.push(`status = $${idx++}`);
+      values.push(updates.status);
+    }
+    if (updates.isModified !== undefined) {
+      setClauses.push(`is_modified = $${idx++}`);
+      values.push(Boolean(updates.isModified));
+    }
+    if (updates.modifiedReason !== undefined) {
+      setClauses.push(`modified_reason = $${idx++}`);
+      values.push(updates.modifiedReason);
+    }
+    // Always update modified_at when patched
+    setClauses.push(`modified_at = NOW()`);
+
+    if (setClauses.length === 0) {
+      return NextResponse.json({ error: "No fields to update" }, { status: 400 });
+    }
+
+    let whereClause = "";
+    if (id) {
+      whereClause = `WHERE id = $${idx}`;
+      values.push(id);
+    } else {
+      whereClause = `WHERE invoice_no = $${idx}`;
+      values.push(invoiceNo);
+    }
+
+    const queryStr = `UPDATE sales SET ${setClauses.join(", ")} ${whereClause} RETURNING *`;
+    const res = await query(queryStr, values);
+
+    if (res.length === 0) {
+      return NextResponse.json({ error: "Sale not found" }, { status: 404 });
+    }
+
+    return NextResponse.json({ success: true, sale: res[0] });
+  } catch (err: any) {
+    console.error("Sales PATCH Error:", err);
+    return NextResponse.json({ error: err?.message }, { status: 500 });
+  }
+}
+

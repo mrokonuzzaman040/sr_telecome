@@ -159,6 +159,9 @@ export interface Sale {
   grossProfit: number; // payableAmount - totalCost
   status: 'completed' | 'returned_partial' | 'returned_full';
   notes?: string;
+  isModified?: boolean;
+  modifiedAt?: string;
+  modifiedReason?: string;
   createdAt: string; // ISO date
 }
 
@@ -220,6 +223,8 @@ export interface DuePayment {
   previousDue: number;
   remainingDue: number;
   notes?: string;
+  invoiceNo?: string;
+  invoiceId?: string;
   createdAt: string;
 }
 

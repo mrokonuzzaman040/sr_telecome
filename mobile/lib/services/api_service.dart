@@ -9,13 +9,71 @@ import '../models/publisher.dart';
 import '../models/return_record.dart';
 import '../models/user.dart';
 
+class AuthRequiredException implements Exception {
+  final String message;
+  const AuthRequiredException([this.message = 'সেশনের মেয়াদ শেষ হয়ে গেছে। পুনরায় লগইন করুন।']);
+  @override
+  String toString() => message;
+}
+
 class ApiService {
   static const String _tokenKey = 'sr_auth_token';
+  static const String _baseUrlKey = 'sr_api_base_url';
 
-  // Production API (Vercel deployment). Fixed - not user-configurable.
-  static const String baseUrl = 'https://srtelecom.vercel.app';
+  // Default production API (Vercel deployment)
+  static const String defaultBaseUrl = 'https://srtelecom.vercel.app';
+  static String _cachedBaseUrl = defaultBaseUrl;
 
-  // --- SESSION TOKEN (Bearer auth for the Flutter client) ---
+  // Mobile networks need a generous timeout for Vercel serverless cold starts
+  static const Duration defaultTimeout = Duration(seconds: 25);
+
+  // --- BASE URL MANAGEMENT ---
+  static Future<String> getBaseUrl() async {
+    final prefs = await SharedPreferences.getInstance();
+    _cachedBaseUrl = prefs.getString(_baseUrlKey) ?? defaultBaseUrl;
+    return _cachedBaseUrl;
+  }
+
+  static Future<void> setBaseUrl(String newUrl) async {
+    final clean = newUrl.trim().replaceAll(RegExp(r'/+$'), '');
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_baseUrlKey, clean);
+    _cachedBaseUrl = clean;
+  }
+
+  static String get baseUrl => _cachedBaseUrl;
+
+  /// Pings the API server and measures latency
+  static Future<Map<String, dynamic>> testConnection([String? testUrl]) async {
+    final target = testUrl != null
+        ? testUrl.trim().replaceAll(RegExp(r'/+$'), '')
+        : await getBaseUrl();
+    final sw = Stopwatch()..start();
+    try {
+      final res = await http
+          .get(Uri.parse('$target/api/auth/login'))
+          .timeout(const Duration(seconds: 10));
+      sw.stop();
+      final ok = res.statusCode < 500;
+      return {
+        'success': ok,
+        'latencyMs': sw.elapsedMilliseconds,
+        'statusCode': res.statusCode,
+        'message': ok
+            ? 'সার্ভার সংযুক্ত (${sw.elapsedMilliseconds}ms)'
+            : 'সার্ভার সমস্যা (HTTP ${res.statusCode})',
+      };
+    } catch (e) {
+      sw.stop();
+      return {
+        'success': false,
+        'latencyMs': sw.elapsedMilliseconds,
+        'message': 'সংযোগ ব্যর্থ: ${e.toString().replaceFirst("Exception: ", "")}',
+      };
+    }
+  }
+
+  // --- SESSION TOKEN ---
   static Future<void> _saveToken(String token) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_tokenKey, token);
@@ -35,7 +93,8 @@ class ApiService {
     final token = await getToken();
     return {
       'Content-Type': 'application/json',
-      if (token != null) 'Authorization': 'Bearer $token',
+      'Accept': 'application/json',
+      if (token != null && token.isNotEmpty) 'Authorization': 'Bearer $token',
     };
   }
 
@@ -45,23 +104,32 @@ class ApiService {
       if (decoded is Map && decoded['error'] != null) return decoded['error'].toString();
     } catch (_) {}
     if (res.statusCode == 401) return 'সেশনের মেয়াদ শেষ হয়ে গেছে, আবার লগইন করুন';
+    if (res.statusCode == 403) return 'অনুমোদন নেই (Forbidden)';
+    if (res.statusCode == 404) return 'রিসোর্স পাওয়া যায়নি (Not Found)';
+    if (res.statusCode >= 500) return 'সার্ভার ত্রুটি (HTTP ${res.statusCode})';
     return 'HTTP ${res.statusCode}';
+  }
+
+  static void _check401(http.Response res) {
+    if (res.statusCode == 401) {
+      throw AuthRequiredException(_extractError(res));
+    }
   }
 
   // --- AUTH ---
   static Future<Map<String, dynamic>> _rawLogin(String username, String pin) async {
-    final url = Uri.parse('$baseUrl/api/auth/login');
+    final base = await getBaseUrl();
+    final url = Uri.parse('$base/api/auth/login');
     final res = await http
         .post(
           url,
           headers: {'Content-Type': 'application/json'},
           body: jsonEncode({'username': username, 'pin': pin}),
         )
-        .timeout(const Duration(seconds: 10));
+        .timeout(defaultTimeout);
     return jsonDecode(res.body) as Map<String, dynamic>;
   }
 
-  /// Logs in and persists the session token for subsequent authenticated requests.
   static Future<AppUser> login(String username, String pin) async {
     final decoded = await _rawLogin(username, pin);
     if (decoded['user'] != null) {
@@ -73,8 +141,6 @@ class ApiService {
     throw Exception(decoded['error']?.toString() ?? 'লগইন ব্যর্থ হয়েছে');
   }
 
-  /// Verifies credentials only (e.g. to unlock an admin-only section) without
-  /// touching the currently persisted session token.
   static Future<bool> verifyPinOnly(String username, String pin) async {
     try {
       final decoded = await _rawLogin(username, pin);
@@ -86,25 +152,29 @@ class ApiService {
 
   // --- PRODUCTS ---
   static Future<List<Product>> fetchProducts() async {
-    final url = Uri.parse('$baseUrl/api/products');
-    final res = await http.get(url, headers: await _authHeaders()).timeout(const Duration(seconds: 10));
+    final base = await getBaseUrl();
+    final url = Uri.parse('$base/api/products');
+    final res = await http.get(url, headers: await _authHeaders()).timeout(defaultTimeout);
 
+    _check401(res);
     if (res.statusCode == 200) {
       final List data = jsonDecode(res.body);
-      return data.map((json) => Product.fromJson(json)).toList();
+      return data.map((json) => Product.fromJson(json as Map<String, dynamic>)).toList();
     } else {
       throw Exception('Failed to load products: ${_extractError(res)}');
     }
   }
 
   static Future<Product> createProduct(Product product) async {
-    final url = Uri.parse('$baseUrl/api/products');
+    final base = await getBaseUrl();
+    final url = Uri.parse('$base/api/products');
     final res = await http.post(
       url,
       headers: await _authHeaders(),
       body: jsonEncode(product.toJson()),
-    );
+    ).timeout(defaultTimeout);
 
+    _check401(res);
     if (res.statusCode == 200 || res.statusCode == 201) {
       final decoded = jsonDecode(res.body);
       return Product.fromJson(decoded['product'] as Map<String, dynamic>);
@@ -114,13 +184,15 @@ class ApiService {
   }
 
   static Future<Product> updateProduct(Product product) async {
-    final url = Uri.parse('$baseUrl/api/products');
+    final base = await getBaseUrl();
+    final url = Uri.parse('$base/api/products');
     final res = await http.put(
       url,
       headers: await _authHeaders(),
       body: jsonEncode(product.toJson()),
-    );
+    ).timeout(defaultTimeout);
 
+    _check401(res);
     if (res.statusCode == 200) {
       final decoded = jsonDecode(res.body);
       return Product.fromJson(decoded['product'] as Map<String, dynamic>);
@@ -131,25 +203,29 @@ class ApiService {
 
   // --- CUSTOMERS ---
   static Future<List<Customer>> fetchCustomers() async {
-    final url = Uri.parse('$baseUrl/api/customers');
-    final res = await http.get(url, headers: await _authHeaders()).timeout(const Duration(seconds: 10));
+    final base = await getBaseUrl();
+    final url = Uri.parse('$base/api/customers');
+    final res = await http.get(url, headers: await _authHeaders()).timeout(defaultTimeout);
 
+    _check401(res);
     if (res.statusCode == 200) {
       final List data = jsonDecode(res.body);
-      return data.map((json) => Customer.fromJson(json)).toList();
+      return data.map((json) => Customer.fromJson(json as Map<String, dynamic>)).toList();
     } else {
       throw Exception('Failed to load customers: ${_extractError(res)}');
     }
   }
 
   static Future<Customer> createCustomer(Customer customer) async {
-    final url = Uri.parse('$baseUrl/api/customers');
+    final base = await getBaseUrl();
+    final url = Uri.parse('$base/api/customers');
     final res = await http.post(
       url,
       headers: await _authHeaders(),
       body: jsonEncode(customer.toJson()),
-    );
+    ).timeout(defaultTimeout);
 
+    _check401(res);
     if (res.statusCode == 200 || res.statusCode == 201) {
       final decoded = jsonDecode(res.body);
       return Customer.fromJson(decoded['customer'] as Map<String, dynamic>);
@@ -159,13 +235,15 @@ class ApiService {
   }
 
   static Future<Customer> updateCustomer(Customer customer) async {
-    final url = Uri.parse('$baseUrl/api/customers');
+    final base = await getBaseUrl();
+    final url = Uri.parse('$base/api/customers');
     final res = await http.put(
       url,
       headers: await _authHeaders(),
       body: jsonEncode(customer.toJson()),
-    );
+    ).timeout(defaultTimeout);
 
+    _check401(res);
     if (res.statusCode == 200) {
       final decoded = jsonDecode(res.body);
       return Customer.fromJson(decoded['customer'] as Map<String, dynamic>);
@@ -183,7 +261,8 @@ class ApiService {
     String? trxId,
     String? notes,
   }) async {
-    final url = Uri.parse('$baseUrl/api/due-payments');
+    final base = await getBaseUrl();
+    final url = Uri.parse('$base/api/due-payments');
     final res = await http.post(
       url,
       headers: await _authHeaders(),
@@ -195,8 +274,9 @@ class ApiService {
         'trxId': trxId,
         'notes': notes,
       }),
-    );
+    ).timeout(defaultTimeout);
 
+    _check401(res);
     if (res.statusCode != 200 && res.statusCode != 201) {
       throw Exception('Failed to collect due: ${_extractError(res)}');
     }
@@ -204,25 +284,29 @@ class ApiService {
 
   // --- SALES / POS CHECKOUT ---
   static Future<List<Sale>> fetchSales() async {
-    final url = Uri.parse('$baseUrl/api/sales');
-    final res = await http.get(url, headers: await _authHeaders()).timeout(const Duration(seconds: 10));
+    final base = await getBaseUrl();
+    final url = Uri.parse('$base/api/sales');
+    final res = await http.get(url, headers: await _authHeaders()).timeout(defaultTimeout);
 
+    _check401(res);
     if (res.statusCode == 200) {
       final List data = jsonDecode(res.body);
-      return data.map((json) => Sale.fromJson(json)).toList();
+      return data.map((json) => Sale.fromJson(json as Map<String, dynamic>)).toList();
     } else {
       throw Exception('Failed to load sales: ${_extractError(res)}');
     }
   }
 
   static Future<Sale> createSale(Sale sale) async {
-    final url = Uri.parse('$baseUrl/api/sales');
+    final base = await getBaseUrl();
+    final url = Uri.parse('$base/api/sales');
     final res = await http.post(
       url,
       headers: await _authHeaders(),
       body: jsonEncode(sale.toJson()),
-    );
+    ).timeout(defaultTimeout);
 
+    _check401(res);
     if (res.statusCode == 200 || res.statusCode == 201) {
       final decoded = jsonDecode(res.body);
       return Sale.fromJson(decoded['sale'] as Map<String, dynamic>);
@@ -233,25 +317,29 @@ class ApiService {
 
   // --- EXPENSES ---
   static Future<List<Expense>> fetchExpenses() async {
-    final url = Uri.parse('$baseUrl/api/expenses');
-    final res = await http.get(url, headers: await _authHeaders()).timeout(const Duration(seconds: 10));
+    final base = await getBaseUrl();
+    final url = Uri.parse('$base/api/expenses');
+    final res = await http.get(url, headers: await _authHeaders()).timeout(defaultTimeout);
 
+    _check401(res);
     if (res.statusCode == 200) {
       final List data = jsonDecode(res.body);
-      return data.map((json) => Expense.fromJson(json)).toList();
+      return data.map((json) => Expense.fromJson(json as Map<String, dynamic>)).toList();
     } else {
       throw Exception('Failed to load expenses: ${_extractError(res)}');
     }
   }
 
   static Future<Expense> createExpense(Expense expense) async {
-    final url = Uri.parse('$baseUrl/api/expenses');
+    final base = await getBaseUrl();
+    final url = Uri.parse('$base/api/expenses');
     final res = await http.post(
       url,
       headers: await _authHeaders(),
       body: jsonEncode(expense.toJson()),
-    );
+    ).timeout(defaultTimeout);
 
+    _check401(res);
     if (res.statusCode == 200 || res.statusCode == 201) {
       final decoded = jsonDecode(res.body);
       return Expense.fromJson(decoded['expense'] as Map<String, dynamic>);
@@ -262,27 +350,29 @@ class ApiService {
 
   // --- PUBLISHERS ---
   static Future<List<Publisher>> fetchPublishers() async {
-    final url = Uri.parse('$baseUrl/api/publishers');
-    final res = await http.get(url, headers: await _authHeaders()).timeout(const Duration(seconds: 10));
+    final base = await getBaseUrl();
+    final url = Uri.parse('$base/api/publishers');
+    final res = await http.get(url, headers: await _authHeaders()).timeout(defaultTimeout);
 
+    _check401(res);
     if (res.statusCode == 200) {
       final List data = jsonDecode(res.body);
-      return data.map((json) => Publisher.fromJson(json)).toList();
+      return data.map((json) => Publisher.fromJson(json as Map<String, dynamic>)).toList();
     } else {
       throw Exception('Failed to load publishers: ${_extractError(res)}');
     }
   }
 
-  // Server upserts by publisher name (ON CONFLICT), so this same call both
-  // creates a new publisher and saves edits to an existing one.
   static Future<Publisher> savePublisher(Publisher publisher) async {
-    final url = Uri.parse('$baseUrl/api/publishers');
+    final base = await getBaseUrl();
+    final url = Uri.parse('$base/api/publishers');
     final res = await http.post(
       url,
       headers: await _authHeaders(),
       body: jsonEncode(publisher.toJson()),
-    );
+    ).timeout(defaultTimeout);
 
+    _check401(res);
     if (res.statusCode == 200 || res.statusCode == 201) {
       final decoded = jsonDecode(res.body);
       return Publisher.fromJson(decoded['publisher'] as Map<String, dynamic>);
@@ -293,25 +383,29 @@ class ApiService {
 
   // --- RETURNS / EXCHANGE ---
   static Future<List<ReturnRecord>> fetchReturns() async {
-    final url = Uri.parse('$baseUrl/api/returns');
-    final res = await http.get(url, headers: await _authHeaders()).timeout(const Duration(seconds: 10));
+    final base = await getBaseUrl();
+    final url = Uri.parse('$base/api/returns');
+    final res = await http.get(url, headers: await _authHeaders()).timeout(defaultTimeout);
 
+    _check401(res);
     if (res.statusCode == 200) {
       final List data = jsonDecode(res.body);
-      return data.map((json) => ReturnRecord.fromJson(json)).toList();
+      return data.map((json) => ReturnRecord.fromJson(json as Map<String, dynamic>)).toList();
     } else {
       throw Exception('Failed to load returns: ${_extractError(res)}');
     }
   }
 
   static Future<ReturnRecord> createReturn(Map<String, dynamic> payload) async {
-    final url = Uri.parse('$baseUrl/api/returns');
+    final base = await getBaseUrl();
+    final url = Uri.parse('$base/api/returns');
     final res = await http.post(
       url,
       headers: await _authHeaders(),
       body: jsonEncode(payload),
-    );
+    ).timeout(defaultTimeout);
 
+    _check401(res);
     if (res.statusCode == 200 || res.statusCode == 201) {
       final decoded = jsonDecode(res.body);
       return ReturnRecord.fromJson(decoded['returnRecord'] as Map<String, dynamic>);
@@ -322,9 +416,11 @@ class ApiService {
 
   // --- BACKUPS (admin only) ---
   static Future<List<Map<String, dynamic>>> fetchBackups() async {
-    final url = Uri.parse('$baseUrl/api/backups');
-    final res = await http.get(url, headers: await _authHeaders()).timeout(const Duration(seconds: 10));
+    final base = await getBaseUrl();
+    final url = Uri.parse('$base/api/backups');
+    final res = await http.get(url, headers: await _authHeaders()).timeout(defaultTimeout);
 
+    _check401(res);
     if (res.statusCode == 200) {
       final List data = jsonDecode(res.body);
       return data.cast<Map<String, dynamic>>();
@@ -334,13 +430,15 @@ class ApiService {
   }
 
   static Future<Map<String, dynamic>> triggerBackup() async {
-    final url = Uri.parse('$baseUrl/api/backups');
+    final base = await getBaseUrl();
+    final url = Uri.parse('$base/api/backups');
     final res = await http.post(
       url,
       headers: await _authHeaders(),
       body: jsonEncode({'backupType': 'manual'}),
-    );
+    ).timeout(defaultTimeout);
 
+    _check401(res);
     if (res.statusCode == 200) {
       return jsonDecode(res.body) as Map<String, dynamic>;
     } else {
@@ -355,7 +453,8 @@ class ApiService {
     String platform = 'android',
   }) async {
     try {
-      final url = Uri.parse('$baseUrl/api/notifications/register-token');
+      final base = await getBaseUrl();
+      final url = Uri.parse('$base/api/notifications/register-token');
       final res = await http.post(
         url,
         headers: await _authHeaders(),
@@ -364,7 +463,7 @@ class ApiService {
           'deviceName': deviceName ?? 'Android Device',
           'platform': platform,
         }),
-      );
+      ).timeout(const Duration(seconds: 10));
       return res.statusCode == 200;
     } catch (_) {
       return false;
@@ -373,7 +472,8 @@ class ApiService {
 
   static Future<List<Map<String, dynamic>>> fetchNotifications() async {
     try {
-      final url = Uri.parse('$baseUrl/api/notifications');
+      final base = await getBaseUrl();
+      final url = Uri.parse('$base/api/notifications');
       final res = await http.get(url, headers: await _authHeaders()).timeout(const Duration(seconds: 10));
 
       if (res.statusCode == 200) {
@@ -386,12 +486,13 @@ class ApiService {
 
   static Future<bool> markNotificationsRead({String? id, bool all = false}) async {
     try {
-      final url = Uri.parse('$baseUrl/api/notifications');
+      final base = await getBaseUrl();
+      final url = Uri.parse('$base/api/notifications');
       final res = await http.patch(
         url,
         headers: await _authHeaders(),
         body: jsonEncode({'id': id, 'all': all}),
-      );
+      ).timeout(const Duration(seconds: 10));
       return res.statusCode == 200;
     } catch (_) {
       return false;

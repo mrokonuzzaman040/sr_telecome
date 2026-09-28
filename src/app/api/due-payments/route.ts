@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { query, pool } from "@/lib/db";
+import { query, pool, ensureInvoiceEnhancements } from "@/lib/db";
 import { verifyAuth } from "@/lib/auth";
 
 export async function GET(req: NextRequest) {
@@ -7,11 +7,14 @@ export async function GET(req: NextRequest) {
     const auth = await verifyAuth(req);
     if (!auth.success) return auth.response;
 
+    await ensureInvoiceEnhancements();
+
     const rows = await query(
       `SELECT id, customer_id as "customerId", customer_name as "customerName", 
               amount::numeric as "amount", payment_method as "paymentMethod", 
               trx_id as "trxId", previous_due::numeric as "previousDue", 
               remaining_due::numeric as "remainingDue", notes, 
+              invoice_no as "invoiceNo", invoice_id as "invoiceId",
               created_at as "createdAt"
        FROM due_payments 
        ORDER BY created_at DESC`
@@ -29,10 +32,14 @@ export async function POST(req: NextRequest) {
     const auth = await verifyAuth(req);
     if (!auth.success) return auth.response;
 
+    await ensureInvoiceEnhancements();
+
     const body = await req.json();
     const id = body.id || `pay-${Date.now()}`;
     const now = new Date().toISOString();
     const amount = Number(body.amount) || 0;
+    const invoiceNo = body.invoiceNo || null;
+    const invoiceId = body.invoiceId || null;
 
     await client.query("BEGIN");
 
@@ -49,8 +56,8 @@ export async function POST(req: NextRequest) {
     const insertRes = await client.query(
       `INSERT INTO due_payments (
         id, customer_id, customer_name, amount, payment_method, trx_id, 
-        previous_due, remaining_due, notes, created_at
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+        previous_due, remaining_due, notes, invoice_no, invoice_id, created_at
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
       RETURNING *`,
       [
         id,
@@ -62,6 +69,8 @@ export async function POST(req: NextRequest) {
         previousDue,
         remainingDue,
         body.notes || null,
+        invoiceNo,
+        invoiceId,
         now,
       ]
     );
@@ -74,6 +83,21 @@ export async function POST(req: NextRequest) {
        WHERE id = $3`,
       [amount, remainingDue, body.customerId]
     );
+
+    // 3. If invoiceNo is supplied, adjust the invoice and mark it as modified
+    if (invoiceNo) {
+      const modReason = `Due payment of ৳${amount} collected (${body.paymentMethod})`;
+      await client.query(
+        `UPDATE sales 
+         SET paid_amount = paid_amount + $1,
+             due_amount = GREATEST(0, due_amount - $1),
+             is_modified = TRUE,
+             modified_at = NOW(),
+             modified_reason = $2
+         WHERE invoice_no = $3`,
+        [amount, modReason, invoiceNo]
+      );
+    }
 
     await client.query("COMMIT");
     return NextResponse.json({
@@ -88,6 +112,8 @@ export async function POST(req: NextRequest) {
         previousDue,
         remainingDue,
         notes: body.notes,
+        invoiceNo,
+        invoiceId,
         createdAt: now,
       },
     });

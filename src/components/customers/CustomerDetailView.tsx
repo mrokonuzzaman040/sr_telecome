@@ -77,14 +77,27 @@ export function CustomerDetailView({ customer, onBack, onSelectInvoice }: Custom
 
   // ---- Inline collect due form ----
   const [isCollectingDue, setIsCollectingDue] = useState(false);
+  const [selectedInvoiceNo, setSelectedInvoiceNo] = useState<string>("");
   const [paymentAmount, setPaymentAmount] = useState<number>(customer.currentDue);
   const [paymentMethod, setPaymentMethod] = useState<"cash" | "bkash" | "nagad" | "bank">("cash");
   const [paymentTrxId, setPaymentTrxId] = useState("");
   const [paymentNote, setPaymentNote] = useState("");
   const [lastReceipt, setLastReceipt] = useState<DuePayment | null>(null);
 
-  const handleOpenCollectDue = () => {
-    setPaymentAmount(customer.currentDue);
+  // Invoices for this customer that have unpaid due
+  const unpaidSales = useMemo(
+    () => customerSales.filter((s) => s.dueAmount > 0),
+    [customerSales]
+  );
+
+  const handleOpenCollectDue = (targetInvoice?: Sale) => {
+    if (targetInvoice) {
+      setSelectedInvoiceNo(targetInvoice.invoiceNo);
+      setPaymentAmount(targetInvoice.dueAmount);
+    } else {
+      setSelectedInvoiceNo("");
+      setPaymentAmount(customer.currentDue);
+    }
     setPaymentMethod("cash");
     setPaymentTrxId("");
     setPaymentNote("");
@@ -100,9 +113,17 @@ export function CustomerDetailView({ customer, onBack, onSelectInvoice }: Custom
       });
       return;
     }
-    const receipt = recordDuePayment(customer.id, paymentAmount, paymentMethod, paymentTrxId, paymentNote);
+    const receipt = recordDuePayment(
+      customer.id,
+      paymentAmount,
+      paymentMethod,
+      paymentTrxId,
+      paymentNote,
+      selectedInvoiceNo || undefined
+    );
     setLastReceipt(receipt);
     setIsCollectingDue(false);
+    setSelectedInvoiceNo("");
   };
 
   return (
@@ -151,6 +172,12 @@ export function CustomerDetailView({ customer, onBack, onSelectInvoice }: Custom
                 <span>গ্রাহক:</span>
                 <span>{lastReceipt.customerName}</span>
               </div>
+              {lastReceipt.invoiceNo && (
+                <div className="flex justify-between font-bold text-indigo-900">
+                  <span>চালান নং (Invoice):</span>
+                  <span>{lastReceipt.invoiceNo}</span>
+                </div>
+              )}
               <div className="flex justify-between">
                 <span>মাধ্যম:</span>
                 <span className="uppercase">{lastReceipt.paymentMethod}</span>
@@ -233,7 +260,7 @@ export function CustomerDetailView({ customer, onBack, onSelectInvoice }: Custom
               {customer.currentDue > 0 && (
                 <button
                   type="button"
-                  onClick={handleOpenCollectDue}
+                  onClick={() => handleOpenCollectDue()}
                   className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-700 hover:bg-emerald-600 text-white text-xs font-medium shadow-2xs transition"
                 >
                   <Coins className="w-3.5 h-3.5" />
@@ -358,6 +385,53 @@ export function CustomerDetailView({ customer, onBack, onSelectInvoice }: Custom
             Collect Due Payment (বাকি আদায়)
           </h3>
           <form onSubmit={handleConfirmDuePayment} className="space-y-3 text-xs">
+            <div>
+              <label className="font-semibold text-slate-700 block mb-1">
+                Select Invoice / নির্দিষ্ট চালান নির্বাচন (ঐচ্ছিক):
+              </label>
+              <select
+                value={selectedInvoiceNo}
+                onChange={(e) => {
+                  const invNo = e.target.value;
+                  setSelectedInvoiceNo(invNo);
+                  if (invNo) {
+                    const match = unpaidSales.find((s) => s.invoiceNo === invNo);
+                    if (match) {
+                      setPaymentAmount(match.dueAmount);
+                    }
+                  } else {
+                    setPaymentAmount(customer.currentDue);
+                  }
+                }}
+                className="w-full sm:w-96 bg-slate-50 border border-slate-300 rounded px-2.5 py-1.5 font-mono text-xs focus:outline-none focus:bg-white"
+              >
+                <option value="">— সকল চালান / একাউন্ট বাকি (General Customer Due) —</option>
+                {unpaidSales.map((sale) => (
+                  <option key={sale.id} value={sale.invoiceNo}>
+                    {sale.invoiceNo} — বাকি: ৳{sale.dueAmount.toLocaleString()} ({formatDateTime(sale.createdAt)})
+                  </option>
+                ))}
+              </select>
+              {selectedInvoiceNo && (
+                <div className="mt-1 flex items-center gap-2 text-[11px] text-indigo-700">
+                  <span>Selected Invoice Due:</span>
+                  <span className="font-bold font-mono">
+                    {formatBDT(unpaidSales.find((s) => s.invoiceNo === selectedInvoiceNo)?.dueAmount || 0)}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedInvoiceNo("");
+                      setPaymentAmount(customer.currentDue);
+                    }}
+                    className="text-xs text-slate-400 hover:text-slate-600 underline ml-2"
+                  >
+                    Clear selection
+                  </button>
+                </div>
+              )}
+            </div>
+
             <div>
               <label className="font-medium text-slate-700 block mb-1">
                 Received Amount / আদায়ের পরিমাণ (৳):
@@ -500,20 +574,31 @@ export function CustomerDetailView({ customer, onBack, onSelectInvoice }: Custom
                   <th className="py-2 px-3 text-right">Paid (৳)</th>
                   <th className="py-2 px-3 text-right">Due (৳)</th>
                   <th className="py-2 px-3 text-right">Profit (৳)</th>
+                  <th className="py-2 px-3 text-center">Action</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {customerSales.map((s) => (
                   <tr key={s.id} className="hover:bg-slate-50/70 transition">
                     <td className="py-2 px-3">
-                      <button
-                        type="button"
-                        onClick={() => onSelectInvoice(s, "thermal")}
-                        className="font-bold text-indigo-700 hover:text-indigo-900 hover:underline underline-offset-2"
-                        title="View / Print Invoice"
-                      >
-                        {s.invoiceNo}
-                      </button>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <button
+                          type="button"
+                          onClick={() => onSelectInvoice(s, "thermal")}
+                          className="font-bold text-indigo-700 hover:text-indigo-900 hover:underline underline-offset-2"
+                          title="View / Print Invoice"
+                        >
+                          {s.invoiceNo}
+                        </button>
+                        {s.isModified && (
+                          <span
+                            className="text-[9px] px-1.5 py-0.2 bg-amber-100 text-amber-800 border border-amber-200 rounded font-normal font-sans"
+                            title={s.modifiedReason || "Invoice modified"}
+                          >
+                            Modified
+                          </span>
+                        )}
+                      </div>
                     </td>
                     <td className="py-2 px-3 text-slate-500 font-sans text-[11px]">
                       {formatDateTime(s.createdAt)}
@@ -522,6 +607,21 @@ export function CustomerDetailView({ customer, onBack, onSelectInvoice }: Custom
                     <td className="py-2 px-3 text-right text-emerald-700">{formatBDT(s.paidAmount)}</td>
                     <td className="py-2 px-3 text-right text-rose-700 font-bold">{formatBDT(s.dueAmount)}</td>
                     <td className="py-2 px-3 text-right text-indigo-700">{formatBDT(s.grossProfit)}</td>
+                    <td className="py-2 px-3 text-center">
+                      {s.dueAmount > 0 ? (
+                        <button
+                          type="button"
+                          onClick={() => handleOpenCollectDue(s)}
+                          className="inline-flex items-center gap-1 px-2.5 py-1 bg-emerald-700 hover:bg-emerald-600 text-white rounded text-[11px] font-sans font-medium transition shadow-2xs"
+                          title={`Collect due for ${s.invoiceNo}`}
+                        >
+                          <Coins className="w-3 h-3" />
+                          <span>বাকি আদায়</span>
+                        </button>
+                      ) : (
+                        <span className="text-[10px] text-slate-400 font-sans">পরিশোধিত</span>
+                      )}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -547,6 +647,7 @@ export function CustomerDetailView({ customer, onBack, onSelectInvoice }: Custom
               <thead className="bg-slate-50/80 text-slate-500 text-[10px] uppercase tracking-wider font-semibold border-b border-slate-200">
                 <tr>
                   <th className="py-2 px-3">Date</th>
+                  <th className="py-2 px-3">Invoice #</th>
                   <th className="py-2 px-3">Method</th>
                   <th className="py-2 px-3 text-right">Paid (৳)</th>
                   <th className="py-2 px-3 text-right">Balance Due (৳)</th>
@@ -557,6 +658,13 @@ export function CustomerDetailView({ customer, onBack, onSelectInvoice }: Custom
                   <tr key={p.id} className="hover:bg-slate-50/70 transition">
                     <td className="py-2 px-3 text-slate-500 font-sans text-[11px]">
                       {formatDateTime(p.createdAt)}
+                    </td>
+                    <td className="py-2 px-3 font-sans">
+                      {p.invoiceNo ? (
+                        <span className="font-bold text-indigo-700 font-mono">{p.invoiceNo}</span>
+                      ) : (
+                        <span className="text-slate-400 text-[10px]">সাধারণ বাকি</span>
+                      )}
                     </td>
                     <td className="py-2 px-3 uppercase text-slate-700">{p.paymentMethod}</td>
                     <td className="py-2 px-3 text-right font-bold text-emerald-700">{formatBDT(p.amount)}</td>

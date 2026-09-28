@@ -1,4 +1,6 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/product.dart';
 import '../models/customer.dart';
 import '../models/sale.dart';
@@ -17,6 +19,8 @@ class StoreProvider extends ChangeNotifier {
 
   bool _isLoading = false;
   String? _errorMessage;
+  bool _isOffline = false;
+  bool _isSessionExpired = false;
 
   // Bumped only when the matching list actually changes (load / create /
   // update / stock or due adjustment) - lets screens use context.select on a
@@ -40,6 +44,9 @@ class StoreProvider extends ChangeNotifier {
   final List<SaleItem> _cart = [];
   Customer? _selectedCustomer;
   String _customerType = 'single'; // 'single' | 'agent'
+  double _agentCommissionRate = 30.0;
+  String _retailDiscountMode = 'percent'; // 'percent' | 'fixed'
+  double _retailDiscountValue = 0.0;
   double _customDiscount = 0.0;
   String _paymentMethod = 'cash'; // 'cash' | 'bkash' | 'nagad' | 'rocket' | 'bank' | 'due'
   double _paidAmount = 0.0;
@@ -53,10 +60,15 @@ class StoreProvider extends ChangeNotifier {
   List<ReturnRecord> get returns => _returns;
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
+  bool get isOffline => _isOffline;
+  bool get isSessionExpired => _isSessionExpired;
 
   List<SaleItem> get cart => _cart;
   Customer? get selectedCustomer => _selectedCustomer;
   String get customerType => _customerType;
+  double get agentCommissionRate => _agentCommissionRate;
+  String get retailDiscountMode => _retailDiscountMode;
+  double get retailDiscountValue => _retailDiscountValue;
   double get customDiscount => _customDiscount;
   String get paymentMethod => _paymentMethod;
   double get paidAmount => _paidAmount;
@@ -70,35 +82,187 @@ class StoreProvider extends ChangeNotifier {
   double get cartDue => (cartPayable - _paidAmount).clamp(0.0, double.infinity);
   int get cartTotalQuantity => _cart.fold(0, (sum, item) => sum + item.quantity);
 
+  // --- OFFLINE CACHE KEYS ---
+  static const String _cacheProductsKey = 'sr_cache_products';
+  static const String _cacheCustomersKey = 'sr_cache_customers';
+  static const String _cacheSalesKey = 'sr_cache_sales';
+  static const String _cacheExpensesKey = 'sr_cache_expenses';
+  static const String _cachePublishersKey = 'sr_cache_publishers';
+  static const String _cacheReturnsKey = 'sr_cache_returns';
+
+  Future<void> _saveOfflineCache() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_cacheProductsKey, jsonEncode(_products.map((p) => p.toJson()).toList()));
+      await prefs.setString(_cacheCustomersKey, jsonEncode(_customers.map((c) => c.toJson()).toList()));
+      await prefs.setString(_cacheSalesKey, jsonEncode(_sales.map((s) => s.toJson()).toList()));
+      await prefs.setString(_cacheExpensesKey, jsonEncode(_expenses.map((e) => e.toJson()).toList()));
+      await prefs.setString(_cachePublishersKey, jsonEncode(_publishers.map((p) => p.toJson()).toList()));
+      await prefs.setString(_cacheReturnsKey, jsonEncode(_returns.map((r) => r.toCreatePayload()).toList()));
+    } catch (e) {
+      debugPrint('Failed to save offline cache: $e');
+    }
+  }
+
+  Future<bool> _loadOfflineCache() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final pStr = prefs.getString(_cacheProductsKey);
+      final cStr = prefs.getString(_cacheCustomersKey);
+      final sStr = prefs.getString(_cacheSalesKey);
+      final eStr = prefs.getString(_cacheExpensesKey);
+      final pubStr = prefs.getString(_cachePublishersKey);
+      final rStr = prefs.getString(_cacheReturnsKey);
+
+      bool loadedAny = false;
+      if (pStr != null && _products.isEmpty) {
+        final List pList = jsonDecode(pStr);
+        _products = pList.map((j) => Product.fromJson(j as Map<String, dynamic>)).toList();
+        _productsVersion++;
+        loadedAny = true;
+      }
+      if (cStr != null && _customers.isEmpty) {
+        final List cList = jsonDecode(cStr);
+        _customers = cList.map((j) => Customer.fromJson(j as Map<String, dynamic>)).toList();
+        _customersVersion++;
+        loadedAny = true;
+      }
+      if (sStr != null && _sales.isEmpty) {
+        final List sList = jsonDecode(sStr);
+        _sales = sList.map((j) => Sale.fromJson(j as Map<String, dynamic>)).toList();
+        _salesVersion++;
+        loadedAny = true;
+      }
+      if (eStr != null && _expenses.isEmpty) {
+        final List eList = jsonDecode(eStr);
+        _expenses = eList.map((j) => Expense.fromJson(j as Map<String, dynamic>)).toList();
+        _expensesVersion++;
+        loadedAny = true;
+      }
+      if (pubStr != null && _publishers.isEmpty) {
+        final List pubList = jsonDecode(pubStr);
+        _publishers = pubList.map((j) => Publisher.fromJson(j as Map<String, dynamic>)).toList();
+        _publishersVersion++;
+        loadedAny = true;
+      }
+      if (rStr != null && _returns.isEmpty) {
+        final List rList = jsonDecode(rStr);
+        _returns = rList.map((j) => ReturnRecord.fromJson(j as Map<String, dynamic>)).toList();
+        _returnsVersion++;
+        loadedAny = true;
+      }
+
+      if (loadedAny) {
+        _isOffline = true;
+      }
+      return loadedAny;
+    } catch (e) {
+      debugPrint('Failed to load offline cache: $e');
+      return false;
+    }
+  }
+
   Future<void> loadAllData() async {
     _isLoading = true;
     _errorMessage = null;
+    _isSessionExpired = false;
     notifyListeners();
 
     try {
+      final token = await ApiService.getToken();
+      if (token == null || token.isEmpty) {
+        _isSessionExpired = true;
+        _errorMessage = 'লগইন মেয়াদ শেষ হয়ে গেছে। পুনরায় লগইন করুন।';
+        await _loadOfflineCache();
+        return;
+      }
+
+      final errors = <String>[];
+
+      // Fetch all core resources with domain-specific error capturing
       final results = await Future.wait([
-        ApiService.fetchProducts().catchError((_) => <Product>[]),
-        ApiService.fetchCustomers().catchError((_) => <Customer>[]),
-        ApiService.fetchSales().catchError((_) => <Sale>[]),
-        ApiService.fetchExpenses().catchError((_) => <Expense>[]),
-        ApiService.fetchPublishers().catchError((_) => <Publisher>[]),
-        ApiService.fetchReturns().catchError((_) => <ReturnRecord>[]),
+        ApiService.fetchProducts().catchError((e) {
+          if (e is AuthRequiredException) _isSessionExpired = true;
+          errors.add('পণ্য (${e.toString().replaceFirst("Exception: ", "")})');
+          return <Product>[];
+        }),
+        ApiService.fetchCustomers().catchError((e) {
+          if (e is AuthRequiredException) _isSessionExpired = true;
+          errors.add('গ্রাহক');
+          return <Customer>[];
+        }),
+        ApiService.fetchSales().catchError((e) {
+          if (e is AuthRequiredException) _isSessionExpired = true;
+          errors.add('বিক্রয়');
+          return <Sale>[];
+        }),
+        ApiService.fetchExpenses().catchError((e) {
+          if (e is AuthRequiredException) _isSessionExpired = true;
+          errors.add('খরচ');
+          return <Expense>[];
+        }),
+        ApiService.fetchPublishers().catchError((e) {
+          if (e is AuthRequiredException) _isSessionExpired = true;
+          errors.add('প্রকাশনী');
+          return <Publisher>[];
+        }),
+        ApiService.fetchReturns().catchError((e) {
+          if (e is AuthRequiredException) _isSessionExpired = true;
+          errors.add('ফেরত');
+          return <ReturnRecord>[];
+        }),
       ]);
 
-      _products = results[0] as List<Product>;
-      _customers = results[1] as List<Customer>;
-      _sales = results[2] as List<Sale>;
-      _expenses = results[3] as List<Expense>;
-      _publishers = results[4] as List<Publisher>;
-      _returns = results[5] as List<ReturnRecord>;
-      _productsVersion++;
-      _customersVersion++;
-      _salesVersion++;
+      final fetchedProducts = results[0] as List<Product>;
+      final fetchedCustomers = results[1] as List<Customer>;
+      final fetchedSales = results[2] as List<Sale>;
+      final fetchedExpenses = results[3] as List<Expense>;
+      final fetchedPublishers = results[4] as List<Publisher>;
+      final fetchedReturns = results[5] as List<ReturnRecord>;
+
+      if (fetchedProducts.isNotEmpty || _products.isEmpty) {
+        _products = fetchedProducts;
+        _productsVersion++;
+      }
+      if (fetchedCustomers.isNotEmpty || _customers.isEmpty) {
+        _customers = fetchedCustomers;
+        _customersVersion++;
+      }
+      if (fetchedSales.isNotEmpty || _sales.isEmpty) {
+        _sales = fetchedSales;
+        _salesVersion++;
+      }
+      _expenses = fetchedExpenses;
       _expensesVersion++;
-      _publishersVersion++;
+      if (fetchedPublishers.isNotEmpty || _publishers.isEmpty) {
+        _publishers = fetchedPublishers;
+        _publishersVersion++;
+      }
+      _returns = fetchedReturns;
       _returnsVersion++;
+
+      if (_isSessionExpired) {
+        _errorMessage = 'লগইন সেশনের মেয়াদ শেষ। অনুগ্রহ করে আবার লগইন করুন।';
+      } else if (errors.length >= 5) {
+        _errorMessage = 'সার্ভার থেকে তথ্য লোড করা যায়নি। ইন্টারনেট সংযোগ বা সার্ভার পরীক্ষা করুন।';
+        await _loadOfflineCache();
+      } else if (errors.isNotEmpty) {
+        _errorMessage = 'কিছু তথ্য সিঙ্ক হয়নি (${errors.join(", ")})';
+        _isOffline = false;
+        await _saveOfflineCache();
+      } else {
+        _isOffline = false;
+        _errorMessage = null;
+        await _saveOfflineCache();
+      }
     } catch (e) {
-      _errorMessage = e.toString();
+      if (e is AuthRequiredException) {
+        _isSessionExpired = true;
+        _errorMessage = 'লগইন সেশনের মেয়াদ শেষ। পুনরায় লগইন করুন।';
+      } else {
+        _errorMessage = 'তথ্য লোড ব্যর্থ: ${e.toString().replaceFirst("Exception: ", "")}';
+      }
+      await _loadOfflineCache();
     } finally {
       _isLoading = false;
       notifyListeners();
@@ -106,6 +270,37 @@ class StoreProvider extends ChangeNotifier {
   }
 
   // --- CART MANAGEMENT ---
+  void _recalculateCartDiscounts() {
+    for (var item in _cart) {
+      if (_customerType == 'agent') {
+        final rate = item.commissionRate ?? _agentCommissionRate;
+        item.updateCommission(rate);
+      } else {
+        if (_retailDiscountMode == 'percent') {
+          final rate = _retailDiscountValue;
+          if (rate > 0) {
+            item.updateCommission(rate);
+          } else {
+            item.updateCommission(0.0);
+            item.commissionRate = null;
+          }
+        } else {
+          // Fixed mode: items sell at MRP, overall flat discount applied via customDiscount
+          item.unitDiscount = 0.0;
+          item.unitPrice = item.mrp;
+          item.commissionRate = null;
+          item.total = item.quantity * item.unitPrice;
+        }
+      }
+    }
+    if (_retailDiscountMode == 'fixed' && _customerType == 'single') {
+      _customDiscount = _retailDiscountValue;
+    } else {
+      _customDiscount = 0.0;
+    }
+    _autoUpdatePaidAmount();
+  }
+
   void addToCart(Product product, {int qty = 1}) {
     final existingIndex = _cart.indexWhere((item) => item.productId == product.id);
 
@@ -117,11 +312,16 @@ class StoreProvider extends ChangeNotifier {
       double? rate;
 
       if (_customerType == 'agent') {
-        rate = product.customCommissionRate ?? 30.0; // Default agent commission 30%
+        rate = product.customCommissionRate ?? _agentCommissionRate;
         unitDiscount = (product.mrp * rate) / 100.0;
+      } else {
+        if (_retailDiscountMode == 'percent' && _retailDiscountValue > 0) {
+          rate = _retailDiscountValue;
+          unitDiscount = (product.mrp * rate) / 100.0;
+        }
       }
 
-      final unitPrice = product.mrp - unitDiscount;
+      final unitPrice = (product.mrp - unitDiscount).clamp(0.0, double.infinity);
       _cart.add(SaleItem(
         productId: product.id,
         productName: product.displayName,
@@ -134,6 +334,10 @@ class StoreProvider extends ChangeNotifier {
         total: qty * unitPrice,
         commissionRate: rate,
       ));
+    }
+
+    if (_retailDiscountMode == 'fixed' && _customerType == 'single') {
+      _customDiscount = _retailDiscountValue;
     }
 
     _autoUpdatePaidAmount();
@@ -162,28 +366,76 @@ class StoreProvider extends ChangeNotifier {
     }
   }
 
+  void updateCartItemDiscount(String productId, double discount) {
+    final index = _cart.indexWhere((item) => item.productId == productId);
+    if (index != -1) {
+      _cart[index].updateDiscount(discount);
+      _autoUpdatePaidAmount();
+      notifyListeners();
+    }
+  }
+
+  void updateCartItemUnitPrice(String productId, double unitPrice) {
+    final index = _cart.indexWhere((item) => item.productId == productId);
+    if (index != -1) {
+      _cart[index].updateUnitPrice(unitPrice);
+      _autoUpdatePaidAmount();
+      notifyListeners();
+    }
+  }
+
+  void setAgentCommissionRate(double rate) {
+    _agentCommissionRate = rate.clamp(0.0, 100.0);
+    if (_customerType == 'agent') {
+      for (var item in _cart) {
+        item.updateCommission(_agentCommissionRate);
+      }
+      _autoUpdatePaidAmount();
+      notifyListeners();
+    }
+  }
+
+  void setRetailDiscountMode(String mode) {
+    _retailDiscountMode = mode;
+    _recalculateCartDiscounts();
+    notifyListeners();
+  }
+
+  void setRetailDiscountValue(double value) {
+    _retailDiscountValue = value.clamp(0.0, double.infinity);
+    _recalculateCartDiscounts();
+    notifyListeners();
+  }
+
+  void quickRoundOff() {
+    final payable = cartPayable;
+    final rounded = (payable / 10).floor() * 10.0;
+    final diff = payable - rounded;
+    if (diff > 0) {
+      _retailDiscountMode = 'fixed';
+      _retailDiscountValue += diff;
+      _recalculateCartDiscounts();
+      notifyListeners();
+    }
+  }
+
   void setCustomerType(String type) {
     _customerType = type;
-    // Re-apply discounts across cart
-    for (var item in _cart) {
-      if (type == 'agent') {
-        item.updateCommission(item.commissionRate ?? 30.0);
-      } else {
-        item.unitDiscount = 0.0;
-        item.unitPrice = item.mrp;
-        item.commissionRate = null;
-        item.total = item.quantity * item.unitPrice;
-      }
-    }
-    _autoUpdatePaidAmount();
+    _recalculateCartDiscounts();
     notifyListeners();
   }
 
   void selectCustomer(Customer? customer) {
     _selectedCustomer = customer;
     if (customer != null) {
-      setCustomerType(customer.type);
+      _customerType = customer.type;
+      if (customer.type == 'agent') {
+        _agentCommissionRate = customer.defaultCommissionRate ?? 30.0;
+      }
+    } else {
+      _customerType = 'single';
     }
+    _recalculateCartDiscounts();
     notifyListeners();
   }
 
@@ -218,6 +470,9 @@ class StoreProvider extends ChangeNotifier {
     _cart.clear();
     _selectedCustomer = null;
     _customerType = 'single';
+    _agentCommissionRate = 30.0;
+    _retailDiscountMode = 'percent';
+    _retailDiscountValue = 0.0;
     _customDiscount = 0.0;
     _paymentMethod = 'cash';
     _paidAmount = 0.0;

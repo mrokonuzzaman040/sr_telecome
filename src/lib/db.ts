@@ -62,3 +62,21 @@ export async function query<T = any>(text: string, params: any[] = []): Promise<
     throw error;
   }
 }
+
+let _invoiceMigrationDone = false;
+export async function ensureInvoiceEnhancements(): Promise<void> {
+  if (_invoiceMigrationDone) return;
+  try {
+    await query(`
+      ALTER TABLE sales ADD COLUMN IF NOT EXISTS is_modified BOOLEAN DEFAULT FALSE;
+      ALTER TABLE sales ADD COLUMN IF NOT EXISTS modified_at TIMESTAMP WITH TIME ZONE;
+      ALTER TABLE sales ADD COLUMN IF NOT EXISTS modified_reason TEXT;
+      ALTER TABLE due_payments ADD COLUMN IF NOT EXISTS invoice_no VARCHAR(64);
+      ALTER TABLE due_payments ADD COLUMN IF NOT EXISTS invoice_id VARCHAR(64);
+    `);
+    _invoiceMigrationDone = true;
+  } catch (err) {
+    console.warn("[ensureInvoiceEnhancements] Migration notice:", err);
+  }
+}
+

@@ -87,6 +87,9 @@ CREATE TABLE IF NOT EXISTS sales (
     gross_profit NUMERIC(12, 2) NOT NULL DEFAULT 0.00,
     status VARCHAR(30) NOT NULL DEFAULT 'completed',
     notes TEXT,
+    is_modified BOOLEAN DEFAULT FALSE,
+    modified_at TIMESTAMP WITH TIME ZONE,
+    modified_reason TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -116,6 +119,8 @@ CREATE TABLE IF NOT EXISTS due_payments (
     previous_due NUMERIC(12, 2) NOT NULL,
     remaining_due NUMERIC(12, 2) NOT NULL,
     notes TEXT,
+    invoice_no VARCHAR(64),
+    invoice_id VARCHAR(64),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 

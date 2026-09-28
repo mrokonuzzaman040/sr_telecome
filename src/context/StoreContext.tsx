@@ -73,11 +73,13 @@ interface StoreContextType {
     amount: number,
     paymentMethod: "cash" | "bkash" | "nagad" | "bank",
     trxId?: string,
-    notes?: string
+    notes?: string,
+    invoiceNo?: string
   ) => DuePayment | null;
 
   // Sale Actions
   createSale: (saleData: Omit<Sale, "id" | "invoiceNo" | "createdAt">) => Sale;
+  updateSale: (id: string, updates: Partial<Sale>) => void;
   getSaleById: (id: string) => Sale | undefined;
   getSaleByInvoice: (invoiceNo: string) => Sale | undefined;
 
@@ -747,13 +749,34 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     amount: number,
     paymentMethod: "cash" | "bkash" | "nagad" | "bank",
     trxId?: string,
-    notes?: string
+    notes?: string,
+    invoiceNo?: string
   ): DuePayment | null => {
     const customer = customers.find((c) => c.id === customerId);
     if (!customer) return null;
 
     const previousDue = customer.currentDue;
     const remainingDue = Math.max(0, previousDue - amount);
+
+    // If payment is linked to a specific invoice, update the sale and mark modified
+    if (invoiceNo) {
+      const modReason = `Due payment of ৳${amount} collected (${paymentMethod})`;
+      setSales((prev) =>
+        prev.map((s) => {
+          if (s.invoiceNo === invoiceNo) {
+            return {
+              ...s,
+              paidAmount: s.paidAmount + amount,
+              dueAmount: Math.max(0, s.dueAmount - amount),
+              isModified: true,
+              modifiedAt: new Date().toISOString(),
+              modifiedReason: modReason,
+            };
+          }
+          return s;
+        })
+      );
+    }
 
     const payment: DuePayment = {
       id: `pay-${Date.now()}`,
@@ -765,6 +788,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       previousDue,
       remainingDue,
       notes,
+      invoiceNo: invoiceNo || undefined,
       createdAt: new Date().toISOString(),
     };
 
@@ -791,6 +815,27 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     }).catch((err) => console.error("API due payment sync error:", err));
 
     return payment;
+  };
+
+  const updateSale = (id: string, updates: Partial<Sale>) => {
+    setSales((prev) =>
+      prev.map((s) =>
+        s.id === id || s.invoiceNo === id
+          ? {
+              ...s,
+              ...updates,
+              isModified: true,
+              modifiedAt: new Date().toISOString(),
+            }
+          : s
+      )
+    );
+
+    fetch("/api/sales", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id, ...updates, isModified: true }),
+    }).catch((err) => console.error("API update sale sync error:", err));
   };
 
   // Notification Actions
@@ -1026,6 +1071,24 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       );
     }
 
+    // Mark invoice as modified if attached to an existing sale
+    if (newReturn.invoiceNo && newReturn.invoiceNo !== 'DIRECT-COUNTER' && newReturn.invoiceNo !== 'COUNTER-RETURN') {
+      const returnModReason = `Items returned/exchanged (${newReturn.returnType})`;
+      setSales((prev) =>
+        prev.map((s) => {
+          if (s.invoiceNo === newReturn.invoiceNo || s.id === newReturn.invoiceId) {
+            return {
+              ...s,
+              isModified: true,
+              modifiedAt: new Date().toISOString(),
+              modifiedReason: returnModReason,
+            };
+          }
+          return s;
+        })
+      );
+    }
+
     // Supabase DB Sync
     fetch("/api/returns", {
       method: "POST",
@@ -1144,6 +1207,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         updateCustomer,
         recordDuePayment,
         createSale,
+        updateSale,
         getSaleById,
         getSaleByInvoice,
         processReturn,

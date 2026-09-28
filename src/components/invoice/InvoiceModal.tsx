@@ -41,7 +41,7 @@ export function InvoiceModal({
   onClose,
   defaultMode = "thermal",
 }: InvoiceModalProps) {
-  const { settings, customers } = useStore();
+  const { settings, customers, returns, duePayments } = useStore();
   const [printMode, setPrintMode] = useState<"thermal" | "a4">(defaultMode);
 
   if (!sale) return null;
@@ -54,6 +54,16 @@ export function InvoiceModal({
     ? Math.max(0, customer.currentDue - sale.dueAmount)
     : 0;
   const currentTotalDue = customer ? customer.currentDue : sale.dueAmount;
+
+  // Determine if this invoice has undergone any changes/modifications
+  const hasReturns = returns.some((r) => r.invoiceNo === sale.invoiceNo || r.invoiceId === sale.id);
+  const hasDuePayments = duePayments.some((p) => p.invoiceNo === sale.invoiceNo);
+  const isModified = Boolean(
+    sale.isModified ||
+    hasReturns ||
+    hasDuePayments ||
+    (sale.modifiedAt && sale.modifiedAt !== sale.createdAt)
+  );
 
   const handlePrint = () => {
     window.print();
@@ -180,6 +190,21 @@ export function InvoiceModal({
                     {sale.customerType === "agent" ? "এজেন্ট (পাইকারি)" : "খুচরা ক্রেতা"}
                   </span>
                 </div>
+                {isModified && (
+                  <div className="pt-1 mt-1 border-t border-dashed border-slate-300 text-center">
+                    <p className="text-[7.5px] font-bold text-amber-900 leading-none">
+                      * yes this invoice is modified
+                    </p>
+                    <p className="text-[7px] text-amber-800/80 leading-none mt-0.5">
+                      (চালানটি পরিমার্জিত / সংশোধিত)
+                    </p>
+                    {sale.modifiedReason && (
+                      <p className="text-[6.5px] text-slate-500 italic mt-0.5 leading-none">
+                        ({sale.modifiedReason})
+                      </p>
+                    )}
+                  </div>
+                )}
               </div>
 
               {/* Items List */}
@@ -302,6 +327,21 @@ export function InvoiceModal({
                     </p>
                     <p>তারিখ: {formatDateTime(sale.createdAt)}</p>
                     {settings.vatRegistrationNo && <p>BIN: {settings.vatRegistrationNo}</p>}
+                    {isModified && (
+                      <div className="pt-1">
+                        <span className="inline-block text-[8px] font-sans font-semibold text-amber-900 bg-amber-50 border border-amber-200 rounded px-1.5 py-0.5 tracking-tight">
+                          * yes this invoice is modified
+                        </span>
+                        <p className="text-[7.5px] text-amber-800 font-sans mt-0.5">
+                          (চালানটি পরিমার্জিত / সংশোধিত)
+                        </p>
+                        {sale.modifiedReason && (
+                          <p className="text-[7px] text-slate-500 font-sans italic">
+                            {sale.modifiedReason}
+                          </p>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -400,6 +440,11 @@ export function InvoiceModal({
                   <div className="mt-4 p-2.5 bg-slate-50 rounded border border-slate-200 text-[11px] text-slate-700">
                     <span className="font-semibold block mb-0.5">মন্তব্য / নোট:</span>
                     <span>{sale.notes || "কোনো বিশেষ মন্তব্য নেই।"}</span>
+                    {isModified && (
+                      <p className="text-[8px] text-slate-500 font-mono italic mt-1.5 pt-1 border-t border-slate-200">
+                        * yes this invoice is modified
+                      </p>
+                    )}
                   </div>
                 </div>
 

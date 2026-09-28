@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
+import '../services/api_service.dart';
 import '../theme/app_theme.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -15,6 +16,15 @@ class _LoginScreenState extends State<LoginScreen> {
   String _username = 'admin'; // matches seeded web-app usernames: admin / cashier
   String? _errorMessage;
   bool _isSubmitting = false;
+  String _serverUrl = ApiService.defaultBaseUrl;
+
+  @override
+  void initState() {
+    super.initState();
+    ApiService.getBaseUrl().then((url) {
+      if (mounted) setState(() => _serverUrl = url);
+    });
+  }
 
   void _onKeyPress(String digit) {
     if (_isSubmitting) return;
@@ -59,138 +69,296 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
+  void _showServerDialog() {
+    final controller = TextEditingController(text: _serverUrl);
+    bool testing = false;
+    String? testMsg;
+    bool? testOk;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Row(
+            children: [
+              Icon(Icons.dns_rounded, color: AppTheme.primary),
+              SizedBox(width: 8),
+              Text('সার্ভার সেটিংস', style: TextStyle(fontSize: 16)),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'API সার্ভার ঠিকানা (Vercel বা লোকাল IP):',
+                style: TextStyle(fontSize: 12, color: AppTheme.textMuted),
+              ),
+              const SizedBox(height: 8),
+              TextField(
+                controller: controller,
+                decoration: const InputDecoration(
+                  hintText: 'https://srtelecom.vercel.app',
+                  isDense: true,
+                ),
+              ),
+              const SizedBox(height: 12),
+              if (testMsg != null)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: (testOk == true ? AppTheme.success : AppTheme.danger).withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        testOk == true ? Icons.check_circle : Icons.error,
+                        size: 16,
+                        color: testOk == true ? AppTheme.success : AppTheme.danger,
+                      ),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          testMsg!,
+                          style: TextStyle(
+                            fontSize: 11.5,
+                            color: testOk == true ? AppTheme.success : AppTheme.danger,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  OutlinedButton.icon(
+                    onPressed: testing
+                        ? null
+                        : () async {
+                            setDialogState(() {
+                              testing = true;
+                              testMsg = 'পিং হচ্ছে...';
+                            });
+                            final r = await ApiService.testConnection(controller.text);
+                            setDialogState(() {
+                              testing = false;
+                              testOk = r['success'] == true;
+                              testMsg = r['message']?.toString();
+                            });
+                          },
+                    icon: testing
+                        ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
+                        : const Icon(Icons.wifi_tethering, size: 16),
+                    label: const Text('টেস্ট', style: TextStyle(fontSize: 12)),
+                  ),
+                  const Spacer(),
+                  TextButton(
+                    onPressed: () => controller.text = ApiService.defaultBaseUrl,
+                    child: const Text('ডিফল্ট', style: TextStyle(fontSize: 12)),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('বাতিল'),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                final newUrl = controller.text.trim();
+                if (newUrl.isNotEmpty) {
+                  await ApiService.setBaseUrl(newUrl);
+                  if (mounted) setState(() => _serverUrl = newUrl);
+                  if (ctx.mounted) Navigator.pop(ctx);
+                }
+              },
+              child: const Text('সংরক্ষণ'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFF0F172A), // Dark slate
       body: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 24),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                // Shop Logo & Title
-                Container(
-                  padding: const EdgeInsets.all(18),
-                  decoration: BoxDecoration(
-                    color: AppTheme.primary.withOpacity(0.2),
-                    shape: BoxShape.circle,
-                    border: Border.all(color: AppTheme.primary, width: 2),
-                  ),
-                  child: const Icon(
-                    Icons.menu_book_rounded,
-                    size: 48,
-                    color: AppTheme.success,
-                  ),
+        child: Stack(
+          children: [
+            // Top Bar: Server Config Button
+            Positioned(
+              top: 8,
+              right: 12,
+              child: TextButton.icon(
+                onPressed: _showServerDialog,
+                icon: const Icon(Icons.dns_outlined, size: 16, color: Colors.white60),
+                label: Text(
+                  _serverUrl.replaceFirst('https://', '').replaceFirst('.vercel.app', ''),
+                  style: const TextStyle(fontSize: 11, color: Colors.white60),
                 ),
-                const SizedBox(height: 16),
-                const Text(
-                  'এস.আর টেলিকম & লাইব্রেরী',
-                  style: TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                  ),
+                style: TextButton.styleFrom(
+                  backgroundColor: Colors.white.withValues(alpha: 0.06),
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                 ),
-                const SizedBox(height: 4),
-                const Text(
-                  'SR Telecom & Library Mobile POS',
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: Colors.white70,
-                    letterSpacing: 0.5,
-                  ),
-                ),
-                const SizedBox(height: 24),
+              ),
+            ),
 
-                // Role selector — picks which username the PIN is checked against
-                Container(
-                  padding: const EdgeInsets.all(4),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.06),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      _buildRoleChip('মালিক', 'admin'),
-                      _buildRoleChip('বিক্রয়কর্মী', 'cashier'),
-                    ],
-                  ),
-                ),
-
-                const SizedBox(height: 24),
-
-                // PIN indicator dots
-                Row(
+            Center(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
-                  children: List.generate(4, (index) {
-                    final filled = index < _pin.length;
-                    return Container(
-                      margin: const EdgeInsets.symmetric(horizontal: 10),
-                      width: 18,
-                      height: 18,
+                  children: [
+                    // Shop Logo & Title
+                    Container(
+                      width: 80,
+                      height: 80,
                       decoration: BoxDecoration(
-                        color: filled ? AppTheme.success : Colors.transparent,
+                        color: AppTheme.primary.withValues(alpha: 0.2),
                         shape: BoxShape.circle,
-                        border: Border.all(
-                          color: filled ? AppTheme.success : Colors.white38,
-                          width: 2,
+                        border: Border.all(color: AppTheme.primary, width: 2),
+                      ),
+                      clipBehavior: Clip.antiAlias,
+                      child: Image.asset(
+                        'assets/icon/app_icon_512.png',
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => const Icon(
+                          Icons.menu_book_rounded,
+                          size: 44,
+                          color: AppTheme.success,
                         ),
                       ),
-                    );
-                  }),
-                ),
+                    ),
+                    const SizedBox(height: 16),
+                    const Text(
+                      'এস.আর টেলিকম & লাইব্রেরী',
+                      style: TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    const Text(
+                      'SR Telecom & Library Mobile POS',
+                      style: TextStyle(
+                        fontSize: 12.5,
+                        color: Colors.white70,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                    const SizedBox(height: 20),
 
-                if (_isSubmitting) ...[
-                  const SizedBox(height: 16),
-                  const SizedBox(
-                    width: 22,
-                    height: 22,
-                    child: CircularProgressIndicator(strokeWidth: 2.5, color: AppTheme.success),
-                  ),
-                ],
-
-                if (_errorMessage != null) ...[
-                  const SizedBox(height: 16),
-                  Text(
-                    _errorMessage!,
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(color: AppTheme.danger, fontSize: 13),
-                  ),
-                ],
-
-                const SizedBox(height: 32),
-
-                // Numeric Keypad
-                Container(
-                  constraints: const BoxConstraints(maxWidth: 320),
-                  child: Column(
-                    children: [
-                      _buildKeyRow(['1', '2', '3']),
-                      const SizedBox(height: 14),
-                      _buildKeyRow(['4', '5', '6']),
-                      const SizedBox(height: 14),
-                      _buildKeyRow(['7', '8', '9']),
-                      const SizedBox(height: 14),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    // Role selector — picks which username the PIN is checked against
+                    Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.06),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
                         children: [
-                          const SizedBox(width: 48, height: 48),
-                          _buildKeyButton('0'),
-                          IconButton(
-                            onPressed: _onBackspace,
-                            icon: const Icon(Icons.backspace_outlined, color: Colors.white70, size: 28),
+                          _buildRoleChip('মালিক (Admin)', 'admin'),
+                          _buildRoleChip('বিক্রয়কর্মী (Cashier)', 'cashier'),
+                        ],
+                      ),
+                    ),
+
+                    const SizedBox(height: 20),
+
+                    // PIN indicator dots
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: List.generate(4, (index) {
+                        final filled = index < _pin.length;
+                        return Container(
+                          margin: const EdgeInsets.symmetric(horizontal: 10),
+                          width: 18,
+                          height: 18,
+                          decoration: BoxDecoration(
+                            color: filled ? AppTheme.success : Colors.transparent,
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: filled ? AppTheme.success : Colors.white38,
+                              width: 2,
+                            ),
+                          ),
+                        );
+                      }),
+                    ),
+
+                    if (_isSubmitting) ...[
+                      const SizedBox(height: 14),
+                      const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2.5, color: AppTheme.success),
+                      ),
+                    ],
+
+                    if (_errorMessage != null) ...[
+                      const SizedBox(height: 14),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: AppTheme.danger.withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: AppTheme.danger.withValues(alpha: 0.3)),
+                        ),
+                        child: Text(
+                          _errorMessage!,
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(color: Colors.white, fontSize: 12),
+                        ),
+                      ),
+                    ],
+
+                    const SizedBox(height: 28),
+
+                    // Numeric Keypad
+                    Container(
+                      constraints: const BoxConstraints(maxWidth: 320),
+                      child: Column(
+                        children: [
+                          _buildKeyRow(['1', '2', '3']),
+                          const SizedBox(height: 12),
+                          _buildKeyRow(['4', '5', '6']),
+                          const SizedBox(height: 12),
+                          _buildKeyRow(['7', '8', '9']),
+                          const SizedBox(height: 12),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                            children: [
+                              const SizedBox(width: 68, height: 68),
+                              _buildKeyButton('0'),
+                              InkWell(
+                                onTap: _onBackspace,
+                                borderRadius: BorderRadius.circular(35),
+                                child: Container(
+                                  width: 68,
+                                  height: 68,
+                                  alignment: Alignment.center,
+                                  child: const Icon(Icons.backspace_outlined, color: Colors.white70, size: 26),
+                                ),
+                              ),
+                            ],
                           ),
                         ],
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
-              ],
+              ),
             ),
-          ),
+          ],
         ),
       ),
     );
@@ -206,7 +374,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 _errorMessage = null;
               }),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         decoration: BoxDecoration(
           color: selected ? AppTheme.success : Colors.transparent,
           borderRadius: BorderRadius.circular(10),
@@ -216,7 +384,7 @@ class _LoginScreenState extends State<LoginScreen> {
           style: TextStyle(
             color: selected ? Colors.white : Colors.white60,
             fontWeight: selected ? FontWeight.bold : FontWeight.normal,
-            fontSize: 13,
+            fontSize: 12.5,
           ),
         ),
       ),
@@ -233,12 +401,12 @@ class _LoginScreenState extends State<LoginScreen> {
   Widget _buildKeyButton(String digit) {
     return InkWell(
       onTap: () => _onKeyPress(digit),
-      borderRadius: BorderRadius.circular(40),
+      borderRadius: BorderRadius.circular(35),
       child: Container(
-        width: 72,
-        height: 72,
+        width: 68,
+        height: 68,
         decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.08),
+          color: Colors.white.withValues(alpha: 0.08),
           shape: BoxShape.circle,
           border: Border.all(color: Colors.white12),
         ),
@@ -246,7 +414,7 @@ class _LoginScreenState extends State<LoginScreen> {
         child: Text(
           digit,
           style: const TextStyle(
-            fontSize: 28,
+            fontSize: 26,
             fontWeight: FontWeight.w600,
             color: Colors.white,
           ),

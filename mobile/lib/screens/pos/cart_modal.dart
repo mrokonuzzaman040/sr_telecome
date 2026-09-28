@@ -5,7 +5,9 @@ import '../../providers/store_provider.dart';
 import '../../models/customer.dart';
 import '../../models/sale.dart';
 import '../../services/printer_service.dart';
+import '../../providers/auth_provider.dart';
 import '../../theme/app_theme.dart';
+import '../../widgets/invoice_preview_sheet.dart';
 
 class CartModal extends StatefulWidget {
   const CartModal({super.key});
@@ -39,6 +41,27 @@ class _CartModalState extends State<CartModal> {
     final store = Provider.of<StoreProvider>(context, listen: false);
     if (store.cart.isEmpty) return;
 
+    if (store.cartDue > 0 && store.selectedCustomer == null) {
+      showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          icon: const Icon(Icons.info_outline, color: AppTheme.secondary, size: 48),
+          title: const Text('রেজিস্টার্ড কাস্টমার প্রয়োজন'),
+          content: const Text(
+            'বাকি (Due) শুধুমাত্র রেজিস্টার্ড কাস্টমার বা এজেন্টের জন্য অনুমোদিত। বাকি রাখতে একজন কাস্টমার নির্বাচন করুন অথবা নতুন প্রোফাইল তৈরি করুন।\n\n'
+            'Due/Baki is only allowed for registered customers or agents. Please select or create a customer profile to record dues.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('ঠিক আছে'),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+
     setState(() => _isProcessing = true);
     try {
       final sale = await store.checkoutSale();
@@ -70,6 +93,15 @@ class _CartModalState extends State<CartModal> {
             TextButton(
               onPressed: () => Navigator.pop(ctx),
               child: const Text('ঠিক আছে'),
+            ),
+            OutlinedButton.icon(
+              icon: const Icon(Icons.receipt_long, size: 18),
+              label: const Text('ইনভয়েস দেখুন'),
+              onPressed: () {
+                Navigator.pop(ctx);
+                final isAdmin = Provider.of<AuthProvider>(context, listen: false).isAdmin;
+                showInvoicePreview(context, sale, isAdmin: isAdmin);
+              },
             ),
             ElevatedButton.icon(
               icon: const Icon(Icons.print, size: 18),

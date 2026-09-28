@@ -33,7 +33,21 @@ class SaleItem {
   void updateCommission(double rate) {
     commissionRate = rate;
     unitDiscount = (mrp * rate) / 100.0;
-    unitPrice = mrp - unitDiscount;
+    unitPrice = (mrp - unitDiscount).clamp(0.0, double.infinity);
+    total = quantity * unitPrice;
+  }
+
+  void updateDiscount(double discount) {
+    unitDiscount = discount.clamp(0.0, mrp);
+    unitPrice = (mrp - unitDiscount).clamp(0.0, double.infinity);
+    commissionRate = mrp > 0 ? ((unitDiscount / mrp) * 100.0) : 0.0;
+    total = quantity * unitPrice;
+  }
+
+  void updateUnitPrice(double newPrice) {
+    unitPrice = newPrice.clamp(0.0, double.infinity);
+    unitDiscount = (mrp - unitPrice).clamp(0.0, double.infinity);
+    commissionRate = mrp > 0 ? ((unitDiscount / mrp) * 100.0) : 0.0;
     total = quantity * unitPrice;
   }
 
