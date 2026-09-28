@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:upgrader/upgrader.dart';
 import 'providers/auth_provider.dart';
 import 'providers/store_provider.dart';
 import 'providers/theme_provider.dart';
@@ -26,17 +27,23 @@ class SRTelecomApp extends StatelessWidget {
       ],
       child: Consumer2<AuthProvider, ThemeProvider>(
         builder: (context, auth, themeProvider, _) {
-          return MaterialApp(
-            title: 'SR Telecom & Library POS',
-            debugShowCheckedModeBanner: false,
-            theme: themeProvider.buildTheme(),
-            home: auth.isLoading
-                ? const LoadingScreen()
-                : !auth.isAuthenticated
-                    ? const LoginScreen()
-                    : auth.needsUnlock
-                        ? const LockScreen()
-                        : const HomeScreen(),
+          return UpgradeAlert(
+            upgrader: Upgrader(
+              languageCode: 'en',
+              durationUntilAlertAgain: const Duration(hours: 4),
+            ),
+            child: MaterialApp(
+              title: 'SR Telecom & Library POS',
+              debugShowCheckedModeBanner: false,
+              theme: themeProvider.buildTheme(),
+              home: auth.isLoading
+                  ? const LoadingScreen()
+                  : !auth.isAuthenticated
+                      ? const LoginScreen()
+                      : auth.needsUnlock
+                          ? const LockScreen()
+                          : const HomeScreen(),
+            ),
           );
         },
       ),

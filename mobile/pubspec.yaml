@@ -47,6 +47,8 @@ dependencies:
   local_auth: ^3.0.1
   pdf: ^3.11.1
   printing: ^5.13.2
+  package_info_plus: ^8.1.2
+  upgrader: ^13.7.0
 
 dev_dependencies:
   flutter_test:
