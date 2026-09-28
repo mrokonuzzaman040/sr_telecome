@@ -145,8 +145,13 @@ class _CartModalState extends State<CartModal> {
       showInvoicePreview(context, sale, isAdmin: isAdmin);
     } catch (e) {
       if (mounted) {
+        final errorMessage = e.toString().replaceFirst('Exception: ', '');
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('ত্রুটি: $e'), backgroundColor: AppTheme.danger),
+          SnackBar(
+            content: Text('বিক্রয় সংরক্ষণ ব্যর্থ: $errorMessage\nইন্টারনেট সংযোগ পরীক্ষা করুন'), 
+            backgroundColor: AppTheme.danger,
+            duration: const Duration(seconds: 4),
+          ),
         );
       }
     } finally {

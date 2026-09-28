@@ -507,42 +507,53 @@ class StoreProvider extends ChangeNotifier {
       createdAt: DateTime.now().toIso8601String(),
     );
 
-    final createdSale = await ApiService.createSale(sale);
-    _sales.insert(0, createdSale);
-    _salesVersion++;
+    debugPrint('🛒 Attempting to save sale to server: ${sale.invoiceNo}');
+    debugPrint('🛒 Sale data: ${sale.toJson()}');
 
-    // Update local stock quantities
-    for (var cartItem in _cart) {
-      final pIndex = _products.indexWhere((p) => p.id == cartItem.productId);
-      if (pIndex != -1) {
-        final p = _products[pIndex];
-        _products[pIndex] = Product(
-          id: p.id,
-          name: p.name,
-          bengaliName: p.bengaliName,
-          category: p.category,
-          barcode: p.barcode,
-          sku: p.sku,
-          publisher: p.publisher,
-          bookClass: p.bookClass,
-          subject: p.subject,
-          itemType: p.itemType,
-          customCommissionRate: p.customCommissionRate,
-          editionYear: p.editionYear,
-          imageUrl: p.imageUrl,
-          buyPrice: p.buyPrice,
-          mrp: p.mrp,
-          stockQty: (p.stockQty - cartItem.quantity).clamp(0, 999999),
-          minStockAlert: p.minStockAlert,
-          unit: p.unit,
-        );
+    try {
+      final createdSale = await ApiService.createSale(sale);
+      debugPrint('✅ Sale saved successfully to server: ${createdSale.invoiceNo}');
+      
+      _sales.insert(0, createdSale);
+      _salesVersion++;
+
+      // Update local stock quantities
+      for (var cartItem in _cart) {
+        final pIndex = _products.indexWhere((p) => p.id == cartItem.productId);
+        if (pIndex != -1) {
+          final p = _products[pIndex];
+          _products[pIndex] = Product(
+            id: p.id,
+            name: p.name,
+            bengaliName: p.bengaliName,
+            category: p.category,
+            barcode: p.barcode,
+            sku: p.sku,
+            publisher: p.publisher,
+            bookClass: p.bookClass,
+            subject: p.subject,
+            itemType: p.itemType,
+            customCommissionRate: p.customCommissionRate,
+            editionYear: p.editionYear,
+            imageUrl: p.imageUrl,
+            buyPrice: p.buyPrice,
+            mrp: p.mrp,
+            stockQty: (p.stockQty - cartItem.quantity).clamp(0, 999999),
+            minStockAlert: p.minStockAlert,
+            unit: p.unit,
+          );
+        }
       }
-    }
 
-    _productsVersion++;
-    clearCart();
-    notifyListeners();
-    return createdSale;
+      _productsVersion++;
+      clearCart();
+      notifyListeners();
+      return createdSale;
+    } catch (e) {
+      debugPrint('❌ Failed to save sale to server: $e');
+      // Re-throw the error to be handled by the UI
+      throw Exception('Failed to save sale: $e');
+    }
   }
 
   // --- DUE COLLECTION ---

@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/product.dart';
@@ -300,17 +301,26 @@ class ApiService {
   static Future<Sale> createSale(Sale sale) async {
     final base = await getBaseUrl();
     final url = Uri.parse('$base/api/sales');
+    
+    debugPrint('📡 POST request to: $url');
+    debugPrint('📦 Request body: ${sale.toJson()}');
+    
     final res = await http.post(
       url,
       headers: await _authHeaders(),
       body: jsonEncode(sale.toJson()),
     ).timeout(defaultTimeout);
 
+    debugPrint('📡 Response status: ${res.statusCode}');
+    debugPrint('📡 Response body: ${res.body}');
+
     _check401(res);
     if (res.statusCode == 200 || res.statusCode == 201) {
       final decoded = jsonDecode(res.body);
+      debugPrint('✅ Sale created successfully: ${decoded['sale']}');
       return Sale.fromJson(decoded['sale'] as Map<String, dynamic>);
     } else {
+      debugPrint('❌ Failed to create sale. Status: ${res.statusCode}, Body: ${res.body}');
       throw Exception('Failed to process sale: ${_extractError(res)}');
     }
   }
