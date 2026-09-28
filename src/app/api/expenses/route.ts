@@ -1,0 +1,61 @@
+import { NextRequest, NextResponse } from "next/server";
+import { query } from "@/lib/db";
+
+export async function GET() {
+  try {
+    const rows = await query(
+      `SELECT id, title, category, amount::numeric as "amount", 
+              TO_CHAR(date, 'YYYY-MM-DD') as "date", notes, 
+              created_at as "createdAt"
+       FROM expenses 
+       ORDER BY date DESC, created_at DESC`
+    );
+    return NextResponse.json(rows);
+  } catch (err: any) {
+    console.error("Expenses GET Error:", err);
+    return NextResponse.json({ error: err?.message }, { status: 500 });
+  }
+}
+
+export async function POST(req: NextRequest) {
+  try {
+    const body = await req.json();
+    const id = body.id || `exp-${Date.now()}`;
+    const now = new Date().toISOString();
+
+    const rows = await query(
+      `INSERT INTO expenses (id, title, category, amount, date, notes, created_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
+       RETURNING id, title, category, amount::numeric as "amount", 
+                 TO_CHAR(date, 'YYYY-MM-DD') as "date", notes, created_at as "createdAt"`,
+      [
+        id,
+        body.title,
+        body.category,
+        Number(body.amount) || 0,
+        body.date,
+        body.notes || null,
+        now,
+      ]
+    );
+
+    return NextResponse.json({ success: true, expense: rows[0] });
+  } catch (err: any) {
+    console.error("Expenses POST Error:", err);
+    return NextResponse.json({ error: err?.message }, { status: 500 });
+  }
+}
+
+export async function DELETE(req: NextRequest) {
+  try {
+    const { searchParams } = new URL(req.url);
+    const id = searchParams.get("id");
+    if (!id) return NextResponse.json({ error: "Expense id required" }, { status: 400 });
+
+    await query(`DELETE FROM expenses WHERE id = $1`, [id]);
+    return NextResponse.json({ success: true });
+  } catch (err: any) {
+    console.error("Expenses DELETE Error:", err);
+    return NextResponse.json({ error: err?.message }, { status: 500 });
+  }
+}

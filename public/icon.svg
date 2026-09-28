@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
+  <rect width="512" height="512" rx="128" fill="#0f172a" />
+  <circle cx="256" cy="256" r="220" stroke="#334155" stroke-width="8" stroke-dasharray="16 16" />
+  <!-- Store / Library Symbol -->
+  <path d="M128 200L256 120L384 200V368C384 376.837 376.837 384 368 384H144C135.163 384 128 376.837 128 368V200Z" fill="#1e293b" stroke="#10b981" stroke-width="16" stroke-linejoin="round" />
+  <!-- Book Spine / Pages -->
+  <path d="M176 256H336M176 304H336M176 352H272" stroke="#38bdf8" stroke-width="14" stroke-linecap="round" />
+  <!-- Glowing Taka / POS Currency badge -->
+  <circle cx="360" cy="180" r="48" fill="#10b981" />
+  <text x="360" y="200" font-family="system-ui, sans-serif" font-size="44" font-weight="900" fill="#ffffff" text-anchor="middle">৳</text>
+</svg>

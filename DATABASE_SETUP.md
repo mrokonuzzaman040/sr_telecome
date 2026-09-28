@@ -1,0 +1,52 @@
+# SR Telecom & Library - Real Database Setup Guide
+## (Neon Postgres & Supabase Integration)
+
+This application is ready to connect directly to **Neon Serverless Postgres** or **Supabase** (both offering 100% free lifetime tiers).
+
+---
+
+### Option 1: Neon Serverless Postgres (Recommended - 100% Free)
+
+1. **Sign Up**: Go to [https://neon.tech](https://neon.tech) and sign up for a free account.
+2. **Create Project**: Name your project (e.g. `sr-telecom-library`).
+3. **Run SQL Schema**:
+   - Go to the **SQL Editor** tab in your Neon console.
+   - Open and copy the SQL code from [`src/lib/schema.sql`](file:///Users/rokon-dev/Desktop/sr-telecom_and_library/src/lib/schema.sql).
+   - Paste it into the Neon SQL Editor and click **Run**. This will create all 8 tables and insert the initial users, settings, and Bangladeshi catalog.
+4. **Copy Connection String**:
+   - Copy your connection string from the Neon dashboard (e.g., `postgresql://neondb_owner:password@ep-xyz.us-east-2.aws.neon.tech/neondb?sslmode=require`).
+   - Create a file named `.env.local` in this project directory:
+     ```env
+     DATABASE_URL="postgresql://neondb_owner:password@ep-xyz.us-east-2.aws.neon.tech/neondb?sslmode=require"
+     ```
+
+---
+
+### Option 2: Supabase (Alternative - 100% Free)
+
+1. **Sign Up**: Go to [https://supabase.com](https://supabase.com) and create a free project.
+2. **Run SQL Schema**:
+   - Go to the **SQL Editor** tab in your Supabase dashboard.
+   - Paste the contents of [`src/lib/schema.sql`](file:///Users/rokon-dev/Desktop/sr-telecom_and_library/src/lib/schema.sql) and click **Run**.
+3. **Copy API Keys**:
+   - Go to **Project Settings** -> **API**.
+   - Copy Project URL and Anon/Service Role Key into `.env.local`:
+     ```env
+     NEXT_PUBLIC_SUPABASE_URL="https://your-project-id.supabase.co"
+     NEXT_PUBLIC_SUPABASE_ANON_KEY="your-anon-key"
+     SUPABASE_SERVICE_ROLE_KEY="your-service-role-key"
+     ```
+
+---
+
+### Role-Based Access Control (Security System)
+
+| Role | Username | Default PIN | Permissions |
+| :--- | :--- | :--- | :--- |
+| **Proprietor / Admin (মালিক)** | `admin` | **`1234`** | **Full Access**: All financial reports, Net Profit/Loss, Cost prices (COGS), Stock additions, Shop settings, Full JSON backup/restore. |
+| **Cashier / Staff (বিক্রয়কর্মী)** | `cashier` | **`5678`** | **Sales & POS**: POS billing, Thermal/A4 print, Stock inventory check, Customer due collection, Returns & Exchange.<br>*(Restricted from viewing profit/loss margins and system configuration)* |
+
+> **Security Guard**:
+> When a cashier tries to access the Profit & Loss Reports or Settings tabs, the software renders:
+> `"Access Restricted: This section requires Proprietor/Admin authentication."`
+> with an instant Admin PIN unlock form so the owner can view reports without forcing a full logout.

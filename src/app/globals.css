@@ -1,0 +1,162 @@
+@import "tailwindcss";
+
+@theme inline {
+  --font-sans: var(--font-app-sans), var(--font-app-bengali), ui-sans-serif, system-ui, sans-serif;
+}
+
+.no-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+@layer base {
+  * {
+    border-color: #e2e8f0;
+    -webkit-tap-highlight-color: transparent;
+  }
+  html {
+    -webkit-text-size-adjust: 100%;
+    touch-action: manipulation;
+  }
+  body {
+    background-color: #f8fafc;
+    color: #0f172a;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+    overscroll-behavior-y: contain;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+}
+
+/* Hide scrollbar for clean native horizontal sliders/chips */
+.scrollbar-none {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+
+/* Safe area insets for mobile notches and home indicators */
+.pb-safe {
+  padding-bottom: max(1rem, env(safe-area-inset-bottom));
+}
+.pt-safe {
+  padding-top: max(0.75rem, env(safe-area-inset-top));
+}
+.bottom-safe {
+  bottom: env(safe-area-inset-bottom);
+}
+
+/* Custom scrollbar for dense tabular data */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+@page {
+  size: A4;
+  margin: 12mm;
+}
+
+/* Print Styles */
+@media print {
+  /* Hide all normal UI elements */
+  .no-print,
+  nav,
+  header,
+  footer,
+  aside,
+  button:not(.allow-print) {
+    display: none !important;
+  }
+
+  body {
+    background: #ffffff !important;
+    color: #000000 !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    font-size: 12px !important;
+  }
+
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  .print-container {
+    display: block !important;
+    position: static !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  /* 58mm Mini Thermal Printer Mode */
+  .thermal-58mm-paper {
+    width: 58mm !important;
+    max-width: 58mm !important;
+    padding: 4mm 2mm !important;
+    margin: 0 auto !important;
+    font-family: 'Courier New', Courier, monospace, sans-serif !important;
+    font-size: 10px !important;
+    line-height: 1.25 !important;
+    color: #000000 !important;
+    background: #ffffff !important;
+    page-break-after: avoid;
+  }
+
+  /* 80mm Mini Thermal Printer Mode */
+  .thermal-80mm-paper {
+    width: 80mm !important;
+    max-width: 80mm !important;
+    padding: 5mm 3mm !important;
+    margin: 0 auto !important;
+    font-family: 'Courier New', Courier, monospace, sans-serif !important;
+    font-size: 11px !important;
+    line-height: 1.3 !important;
+    color: #000000 !important;
+    background: #ffffff !important;
+    page-break-after: avoid;
+  }
+
+  /* A4 Standard Paper Invoice Mode — height follows content (few items = partial
+     page, more items = grows and paginates naturally), never forced to a full page */
+  .a4-paper {
+    width: 210mm !important;
+    padding: 15mm 20mm !important;
+    margin: 0 auto !important;
+    color: #000000 !important;
+    background: #ffffff !important;
+    box-sizing: border-box !important;
+  }
+
+  /* Force table borders and crisp print lines */
+  table, th, td {
+    border-color: #000000 !important;
+  }
+
+  /* Keep rows/headings intact across page breaks instead of splitting mid-row */
+  tr {
+    page-break-inside: avoid;
+  }
+  thead {
+    display: table-header-group;
+  }
+  h2, h3 {
+    page-break-after: avoid;
+  }
+}

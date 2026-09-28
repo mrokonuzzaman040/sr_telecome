@@ -1,0 +1,110 @@
+import { NextRequest, NextResponse } from "next/server";
+import { query, pool } from "@/lib/db";
+import { SaleItem } from "@/types";
+
+export async function GET() {
+  try {
+    const rows = await query(
+      `SELECT id, invoice_no as "invoiceNo", customer_id as "customerId", 
+              customer_name as "customerName", customer_phone as "customerPhone", 
+              customer_type as "customerType", items, 
+              subtotal::numeric as "subtotal", 
+              total_discount::numeric as "totalDiscount", 
+              payable_amount::numeric as "payableAmount", 
+              paid_amount::numeric as "paidAmount", 
+              due_amount::numeric as "dueAmount", 
+              payment_method as "paymentMethod", 
+              payment_details as "paymentDetails", 
+              total_cost::numeric as "totalCost", 
+              gross_profit::numeric as "grossProfit", 
+              status, notes, created_at as "createdAt"
+       FROM sales 
+       ORDER BY created_at DESC`
+    );
+    return NextResponse.json(rows);
+  } catch (err: any) {
+    console.error("Sales GET Error:", err);
+    return NextResponse.json({ error: err?.message }, { status: 500 });
+  }
+}
+
+export async function POST(req: NextRequest) {
+  const client = await pool.connect();
+  try {
+    const body = await req.json();
+    const id = body.id || `sale-${Date.now()}`;
+    const invoiceNo = body.invoiceNo;
+    const now = new Date().toISOString();
+
+    await client.query("BEGIN");
+
+    // 1. Insert into sales
+    const insertRes = await client.query(
+      `INSERT INTO sales (
+        id, invoice_no, customer_id, customer_name, customer_phone, customer_type, 
+        items, subtotal, total_discount, payable_amount, paid_amount, due_amount, 
+        payment_method, payment_details, total_cost, gross_profit, status, notes, created_at
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
+      RETURNING *`,
+      [
+        id,
+        invoiceNo,
+        body.customerId || null,
+        body.customerName,
+        body.customerPhone || null,
+        body.customerType,
+        JSON.stringify(body.items),
+        Number(body.subtotal) || 0,
+        Number(body.totalDiscount) || 0,
+        Number(body.payableAmount) || 0,
+        Number(body.paidAmount) || 0,
+        Number(body.dueAmount) || 0,
+        body.paymentMethod,
+        JSON.stringify(body.paymentDetails || {}),
+        Number(body.totalCost) || 0,
+        Number(body.grossProfit) || 0,
+        body.status || "completed",
+        body.notes || null,
+        now,
+      ]
+    );
+
+    // 2. Decrement stock for each item in products
+    if (Array.isArray(body.items)) {
+      for (const item of body.items as SaleItem[]) {
+        await client.query(
+          `UPDATE products 
+           SET stock_qty = GREATEST(0, stock_qty - $1), updated_at = NOW() 
+           WHERE id = $2`,
+          [item.quantity, item.productId]
+        );
+      }
+    }
+
+    // 3. Update customer ledger if linked
+    if (body.customerId) {
+      await client.query(
+        `UPDATE customers 
+         SET total_purchased = total_purchased + $1,
+             total_paid = total_paid + $2,
+             current_due = current_due + $3
+         WHERE id = $4`,
+        [
+          Number(body.payableAmount) || 0,
+          Number(body.paidAmount) || 0,
+          Number(body.dueAmount) || 0,
+          body.customerId,
+        ]
+      );
+    }
+
+    await client.query("COMMIT");
+    return NextResponse.json({ success: true, sale: insertRes.rows[0] });
+  } catch (err: any) {
+    await client.query("ROLLBACK");
+    console.error("Sales POST Error:", err);
+    return NextResponse.json({ error: err?.message }, { status: 500 });
+  } finally {
+    client.release();
+  }
+}
