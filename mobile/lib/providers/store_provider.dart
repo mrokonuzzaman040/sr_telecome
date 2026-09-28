@@ -163,7 +163,6 @@ class StoreProvider extends ChangeNotifier {
   }
 
   Future<void> loadAllData() async {
-    debugPrint('📡 Starting combined data sync from server...');
     _isLoading = true;
     _errorMessage = null;
     _isSessionExpired = false;
@@ -186,7 +185,6 @@ class StoreProvider extends ChangeNotifier {
       final fetchedSales = (syncData['sales'] as List?)?.map((e) => Sale.fromJson(e)).toList() ?? [];
       final fetchedExpenses = (syncData['expenses'] as List?)?.map((e) => Expense.fromJson(e)).toList() ?? [];
 
-      debugPrint('📦 Synced: ${fetchedSales.length} sales, ${fetchedProducts.length} products, ${fetchedCustomers.length} customers, ${fetchedExpenses.length} expenses');
 
       if (fetchedProducts.isNotEmpty || _products.isEmpty) {
         _products = fetchedProducts;
@@ -206,7 +204,6 @@ class StoreProvider extends ChangeNotifier {
       _isOffline = false;
       _errorMessage = null;
       await _saveOfflineCache();
-      debugPrint('✅ Combined sync completed successfully');
     } catch (e) {
       debugPrint('❌ Combined sync failed: $e');
       if (e is AuthRequiredException) {

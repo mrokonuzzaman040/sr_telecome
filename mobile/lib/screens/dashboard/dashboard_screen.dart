@@ -29,7 +29,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
       final now = DateTime.now();
       
       final isToday = d.year == now.year && d.month == now.month && d.day == now.day;
-      debugPrint('📅 Date check: $isoDate -> Local: $d -> Today: $now -> Match: $isToday');
       return isToday;
     } catch (_) {
       return false;
