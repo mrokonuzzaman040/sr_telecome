@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "353037722643",
+    "project_id": "boighor-pos",
+    "storage_bucket": "boighor-pos.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:353037722643:android:962291872c92f0bb138be6",
+        "android_client_info": {
+          "package_name": "com.boighor.boighor_pos"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCqpI6rrwZsEa9_JeuepSD5Vf6In6m6P70"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
