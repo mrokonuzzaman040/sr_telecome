@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { useStore } from "@/context/StoreContext";
 import {
   LayoutDashboard,
@@ -217,6 +217,17 @@ export function Sidebar({
     },
   ];
 
+  // Filter groups and items based on role so admin items do NOT show in Cashier / Staff panel
+  const visibleGroups = useMemo(() => {
+    return navGroups
+      .filter((group) => isAdmin || !group.adminOnly)
+      .map((group) => ({
+        ...group,
+        items: group.items.filter((item) => isAdmin || !item.adminOnly),
+      }))
+      .filter((group) => group.items.length > 0);
+  }, [isAdmin, lowStockCount]);
+
   // Open/Close state for each dropdown group
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({
     sales: true,
@@ -231,13 +242,13 @@ export function Sidebar({
 
   // Auto-expand group when activeTab belongs to it
   useEffect(() => {
-    for (const group of navGroups) {
+    for (const group of visibleGroups) {
       if (group.items.some((item) => item.id === activeTab)) {
         setOpenGroups((prev) => ({ ...prev, [group.groupId]: true }));
         break;
       }
     }
-  }, [activeTab]);
+  }, [activeTab, visibleGroups]);
 
   const toggleGroup = (groupId: string) => {
     setOpenGroups((prev) => ({
@@ -256,7 +267,7 @@ export function Sidebar({
   const handleToggleAllGroups = () => {
     const areAllOpen = Object.values(openGroups).every(Boolean);
     const nextState: Record<string, boolean> = {};
-    navGroups.forEach((g) => {
+    visibleGroups.forEach((g) => {
       nextState[g.groupId] = !areAllOpen;
     });
     setOpenGroups(nextState);
@@ -382,7 +393,7 @@ export function Sidebar({
             )}
 
             {/* 2. Hierarchical Dropdown Groups */}
-            {navGroups.map((group) => {
+            {visibleGroups.map((group) => {
               const GroupIcon = group.icon;
               const isGroupLocked = group.adminOnly && !isAdmin;
               const isGroupOpen = Boolean(openGroups[group.groupId]);

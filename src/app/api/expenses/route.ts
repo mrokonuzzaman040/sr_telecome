@@ -1,8 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query } from "@/lib/db";
+import { verifyAuth } from "@/lib/auth";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
+    const auth = await verifyAuth(req);
+    if (!auth.success) return auth.response;
+
     const rows = await query(
       `SELECT id, title, category, amount::numeric as "amount", 
               TO_CHAR(date, 'YYYY-MM-DD') as "date", notes, 
@@ -19,6 +23,9 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   try {
+    const auth = await verifyAuth(req);
+    if (!auth.success) return auth.response;
+
     const body = await req.json();
     const id = body.id || `exp-${Date.now()}`;
     const now = new Date().toISOString();
@@ -48,6 +55,9 @@ export async function POST(req: NextRequest) {
 
 export async function DELETE(req: NextRequest) {
   try {
+    const auth = await verifyAuth(req, { requiredRole: "admin" });
+    if (!auth.success) return auth.response;
+
     const { searchParams } = new URL(req.url);
     const id = searchParams.get("id");
     if (!id) return NextResponse.json({ error: "Expense id required" }, { status: 400 });

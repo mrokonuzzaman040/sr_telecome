@@ -1,8 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query } from "@/lib/db";
+import { verifyAuth } from "@/lib/auth";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
+    const auth = await verifyAuth(req);
+    if (!auth.success) return auth.response;
+
     const rows = await query(
       `SELECT id, name, bengali_name as "bengaliName", code, phone, address, 
               logo_url as "logoUrl", notes, 
@@ -21,6 +25,9 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   try {
+    const auth = await verifyAuth(req);
+    if (!auth.success) return auth.response;
+
     const body = await req.json();
     if (!body.name) {
       return NextResponse.json({ error: "Publisher name is required" }, { status: 400 });
@@ -72,6 +79,9 @@ export async function POST(req: NextRequest) {
 
 export async function DELETE(req: NextRequest) {
   try {
+    const auth = await verifyAuth(req, { requiredRole: "admin" });
+    if (!auth.success) return auth.response;
+
     const { searchParams } = new URL(req.url);
     const id = searchParams.get("id");
     if (!id) return NextResponse.json({ error: "Publisher id required" }, { status: 400 });

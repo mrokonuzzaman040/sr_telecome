@@ -1,8 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query } from "@/lib/db";
+import { verifyAuth } from "@/lib/auth";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
+    const auth = await verifyAuth(req);
+    if (!auth.success) return auth.response;
+
     const rows = await query(
       `SELECT id, name, bengali_name as "bengaliName", category, barcode, sku, publisher, 
               book_class as "bookClass", subject, item_type as "itemType",
@@ -24,6 +28,8 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   try {
+    const auth = await verifyAuth(req);
+    if (!auth.success) return auth.response;
     const body = await req.json();
 
     // Check if bulk insert
@@ -131,6 +137,9 @@ export async function POST(req: NextRequest) {
 
 export async function PUT(req: NextRequest) {
   try {
+    const auth = await verifyAuth(req);
+    if (!auth.success) return auth.response;
+
     const body = await req.json();
     const { id, stockQty, buyPrice, mrp, name, bengaliName, publisher, bookClass, subject, itemType, customCommissionRate, minStockAlert, imageUrl } = body;
     if (!id) return NextResponse.json({ error: "Product id required" }, { status: 400 });
@@ -185,6 +194,9 @@ export async function PUT(req: NextRequest) {
 
 export async function DELETE(req: NextRequest) {
   try {
+    const auth = await verifyAuth(req, { requiredRole: "admin" });
+    if (!auth.success) return auth.response;
+
     const { searchParams } = new URL(req.url);
     const id = searchParams.get("id");
     if (!id) return NextResponse.json({ error: "Product id required" }, { status: 400 });

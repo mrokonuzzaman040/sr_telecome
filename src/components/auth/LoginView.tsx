@@ -47,9 +47,9 @@ export function LoginView() {
     setPin((prev) => prev.slice(0, -1));
   };
 
-  const handleQuickAccountSelect = (selectedUser: string, defaultPin: string) => {
+  const handleAccountSelect = (selectedUser: string) => {
     setUsername(selectedUser);
-    setPin(defaultPin);
+    setPin("");
     setErrorMsg("");
   };
 
@@ -89,7 +89,7 @@ export function LoginView() {
             <div className="grid grid-cols-2 gap-2">
               <button
                 type="button"
-                onClick={() => handleQuickAccountSelect("admin", "1234")}
+                onClick={() => handleAccountSelect("admin")}
                 className={`p-2.5 rounded-lg border text-left transition ${
                   username === "admin"
                     ? "bg-slate-900 text-white border-slate-900 shadow-sm"
@@ -111,7 +111,7 @@ export function LoginView() {
 
               <button
                 type="button"
-                onClick={() => handleQuickAccountSelect("cashier", "5678")}
+                onClick={() => handleAccountSelect("cashier")}
                 className={`p-2.5 rounded-lg border text-left transition ${
                   username === "cashier"
                     ? "bg-slate-900 text-white border-slate-900 shadow-sm"
@@ -201,18 +201,6 @@ export function LoginView() {
               <ArrowRight className="w-4 h-4" />
             </button>
           </form>
-
-          {/* Quick Demo Credentials Reminder */}
-          <div className="p-3 bg-slate-50 rounded-lg border border-slate-200 text-[11px] text-slate-600 space-y-1 font-mono">
-            <div className="flex justify-between">
-              <span>Admin / Proprietor PIN:</span>
-              <span className="font-bold text-slate-900">1234</span>
-            </div>
-            <div className="flex justify-between">
-              <span>Cashier / Staff PIN:</span>
-              <span className="font-bold text-slate-900">5678</span>
-            </div>
-          </div>
         </div>
       </div>
     </div>

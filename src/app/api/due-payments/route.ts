@@ -1,8 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query, pool } from "@/lib/db";
+import { verifyAuth } from "@/lib/auth";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
+    const auth = await verifyAuth(req);
+    if (!auth.success) return auth.response;
+
     const rows = await query(
       `SELECT id, customer_id as "customerId", customer_name as "customerName", 
               amount::numeric as "amount", payment_method as "paymentMethod", 
@@ -22,6 +26,9 @@ export async function GET() {
 export async function POST(req: NextRequest) {
   const client = await pool.connect();
   try {
+    const auth = await verifyAuth(req);
+    if (!auth.success) return auth.response;
+
     const body = await req.json();
     const id = body.id || `pay-${Date.now()}`;
     const now = new Date().toISOString();

@@ -265,7 +265,7 @@ export function InvoiceModal({
                 <p className="font-medium text-slate-800">{settings.invoiceFooterMessage}</p>
                 <p>ধন্যবাদ, আবার আসবেন!</p>
                 <p className="text-[8px] text-slate-400 font-mono">
-                  Software by Antigravity POS
+                  Software by Rokon Uzzaman
                 </p>
               </div>
               </div>

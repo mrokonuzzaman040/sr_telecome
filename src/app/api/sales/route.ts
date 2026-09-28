@@ -1,9 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query, pool } from "@/lib/db";
 import { SaleItem } from "@/types";
+import { verifyAuth } from "@/lib/auth";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
+    const auth = await verifyAuth(req);
+    if (!auth.success) return auth.response;
+
     const rows = await query(
       `SELECT id, invoice_no as "invoiceNo", customer_id as "customerId", 
               customer_name as "customerName", customer_phone as "customerPhone", 
@@ -21,7 +25,20 @@ export async function GET() {
        FROM sales 
        ORDER BY created_at DESC`
     );
-    return NextResponse.json(rows);
+
+    // If role is staff, redact cost and profit margins
+    const sanitized = rows.map((sale: any) => {
+      if (auth.user.role !== "admin") {
+        return {
+          ...sale,
+          totalCost: 0,
+          grossProfit: 0,
+        };
+      }
+      return sale;
+    });
+
+    return NextResponse.json(sanitized);
   } catch (err: any) {
     console.error("Sales GET Error:", err);
     return NextResponse.json({ error: err?.message }, { status: 500 });
@@ -31,6 +48,9 @@ export async function GET() {
 export async function POST(req: NextRequest) {
   const client = await pool.connect();
   try {
+    const auth = await verifyAuth(req);
+    if (!auth.success) return auth.response;
+
     const body = await req.json();
     const id = body.id || `sale-${Date.now()}`;
     const invoiceNo = body.invoiceNo;

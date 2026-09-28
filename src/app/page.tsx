@@ -67,6 +67,15 @@ function MainDashboard() {
     prevTabRef.current = activeTab;
   }, [activeTab]);
 
+  // Security Gate: Ensure Cashier / Staff does not access admin-only tabs
+  useEffect(() => {
+    if (currentUser && currentUser.role !== "admin") {
+      if (activeTab === "reports" || activeTab === "settings") {
+        setActiveTab("pos");
+      }
+    }
+  }, [currentUser, activeTab]);
+
   const handleToggleSidebarCollapse = () => {
     setIsSidebarCollapsed((prev) => {
       const next = !prev;
@@ -131,7 +140,11 @@ function MainDashboard() {
         <Navbar
           activeTab={activeTab}
           onToggleMobileSidebar={() => setIsMobileSidebarOpen(!isMobileSidebarOpen)}
-          onOpenSettings={() => setActiveTab("settings")}
+          onOpenSettings={() => {
+            if (currentUser?.role === "admin") {
+              setActiveTab("settings");
+            }
+          }}
           isSidebarCollapsed={isSidebarCollapsed}
           onToggleSidebarCollapse={handleToggleSidebarCollapse}
         />

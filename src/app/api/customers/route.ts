@@ -1,8 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query } from "@/lib/db";
+import { verifyAuth } from "@/lib/auth";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
+    const auth = await verifyAuth(req);
+    if (!auth.success) return auth.response;
+
     const rows = await query(
       `SELECT id, name, phone, address, type, 
               default_commission_rate::numeric as "defaultCommissionRate", 
@@ -22,6 +26,9 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   try {
+    const auth = await verifyAuth(req);
+    if (!auth.success) return auth.response;
+
     const body = await req.json();
     const id = body.id || `cust-${Date.now()}`;
     const now = new Date().toISOString();
@@ -54,6 +61,46 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ success: true, customer: rows[0] });
   } catch (err: any) {
     console.error("Customers POST Error:", err);
+    return NextResponse.json({ error: err?.message }, { status: 500 });
+  }
+}
+
+export async function PUT(req: NextRequest) {
+  try {
+    const auth = await verifyAuth(req);
+    if (!auth.success) return auth.response;
+    const body = await req.json();
+    const { id, name, phone, address, type, defaultCommissionRate } = body;
+    if (!id) return NextResponse.json({ error: "Customer id required" }, { status: 400 });
+
+    const rows = await query(
+      `UPDATE customers
+       SET name = COALESCE($2, name),
+           phone = COALESCE($3, phone),
+           address = COALESCE($4, address),
+           type = COALESCE($5, type),
+           default_commission_rate = COALESCE($6, default_commission_rate)
+       WHERE id = $1
+       RETURNING id, name, phone, address, type,
+                 default_commission_rate::numeric as "defaultCommissionRate",
+                 total_purchased::numeric as "totalPurchased",
+                 total_paid::numeric as "totalPaid",
+                 current_due::numeric as "currentDue",
+                 created_at as "createdAt"`,
+      [
+        id,
+        name || null,
+        phone || null,
+        address || null,
+        type || null,
+        defaultCommissionRate !== undefined ? Number(defaultCommissionRate) : null,
+      ]
+    );
+
+    if (!rows[0]) return NextResponse.json({ error: "Customer not found" }, { status: 404 });
+    return NextResponse.json({ success: true, customer: rows[0] });
+  } catch (err: any) {
+    console.error("Customers PUT Error:", err);
     return NextResponse.json({ error: err?.message }, { status: 500 });
   }
 }
