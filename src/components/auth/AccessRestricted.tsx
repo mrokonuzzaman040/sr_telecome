@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import { useStore } from "@/context/StoreContext";
-import { ShieldAlert, Lock, ArrowLeft, KeyRound, CheckCircle2 } from "lucide-react";
+import { ShieldAlert, ArrowLeft, KeyRound } from "lucide-react";
 
 interface AccessRestrictedProps {
   onBackToSafeTab: () => void;
@@ -16,14 +16,23 @@ export function AccessRestricted({
   const { currentUser, login } = useStore();
   const [adminPin, setAdminPin] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleElevateToAdmin = (e: React.FormEvent) => {
+  const handleElevateToAdmin = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg("");
 
-    const success = login("admin", adminPin);
-    if (!success) {
-      setErrorMsg("Invalid Admin PIN. Please enter the correct proprietor PIN (Default: 1234).");
+    if (!adminPin.trim()) {
+      setErrorMsg("Please enter the Admin PIN.");
+      return;
+    }
+
+    setIsSubmitting(true);
+    const result = await login("admin", adminPin);
+    setIsSubmitting(false);
+
+    if (!result.success) {
+      setErrorMsg(result.error || "Invalid Admin PIN. Please enter the correct proprietor PIN.");
     }
   };
 
@@ -38,7 +47,7 @@ export function AccessRestricted({
         {/* Heading & Bengali Note */}
         <div>
           <h2 className="text-lg font-bold text-slate-900 tracking-tight leading-snug">
-            Access Restricted: This section requires Proprietor/Admin authentication.
+            Access Restricted: This section requires {requiredRole} authentication.
           </h2>
           <p className="text-xs text-rose-700 font-medium mt-1">
             এই বিভাগে (লাভ-ক্ষতি ও দোকানের সেটিংস) প্রবেশের জন্য স্বত্বাধিকারী/মালিকের অনুমোদন প্রয়োজন।
@@ -63,16 +72,18 @@ export function AccessRestricted({
             <input
               type="password"
               maxLength={6}
-              placeholder="Admin PIN (1234)"
+              placeholder="Admin PIN"
               value={adminPin}
               onChange={(e) => setAdminPin(e.target.value)}
+              disabled={isSubmitting}
               className="flex-1 bg-white border border-slate-300 rounded-lg px-3 py-2 text-center font-mono font-bold text-base text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-900"
             />
             <button
               type="submit"
-              className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-lg font-semibold text-xs transition shadow-xs"
+              disabled={isSubmitting}
+              className="px-4 py-2 bg-slate-900 hover:bg-slate-800 disabled:opacity-60 text-white rounded-lg font-semibold text-xs transition shadow-xs cursor-pointer disabled:cursor-not-allowed"
             >
-              Unlock
+              {isSubmitting ? "Verifying..." : "Unlock"}
             </button>
           </div>
 
@@ -83,7 +94,7 @@ export function AccessRestricted({
         <div>
           <button
             onClick={onBackToSafeTab}
-            className="inline-flex items-center gap-2 px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-semibold transition border border-slate-300"
+            className="inline-flex items-center gap-2 px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-semibold transition border border-slate-300 cursor-pointer"
           >
             <ArrowLeft className="w-4 h-4" />
             <span>Return to POS Billing (ক্যাশ কাউন্টারে ফিরে যান)</span>

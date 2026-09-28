@@ -11,6 +11,9 @@ import {
   CheckCircle,
   Database,
   Save,
+  ShieldCheck,
+  KeyRound,
+  Lock,
 } from "lucide-react";
 
 export function SettingsView() {
@@ -23,6 +26,7 @@ export function SettingsView() {
     dailyBackups,
     createDailyBackup,
     loadDailyBackups,
+    updateUserPin,
     showAlert,
     showConfirm,
   } = useStore();
@@ -30,6 +34,79 @@ export function SettingsView() {
   const [form, setForm] = useState<ShopSettings>({ ...settings });
   const [importStatus, setImportStatus] = useState<string>("");
   const [isSnapshotting, setIsSnapshotting] = useState<boolean>(false);
+
+  // PIN Management state
+  const [currentAdminPin, setCurrentAdminPin] = useState("");
+  const [newAdminPin, setNewAdminPin] = useState("");
+  const [confirmAdminPin, setConfirmAdminPin] = useState("");
+  const [isChangingAdminPin, setIsChangingAdminPin] = useState(false);
+
+  const [newCashierPin, setNewCashierPin] = useState("");
+  const [isChangingCashierPin, setIsChangingCashierPin] = useState(false);
+
+  const handleAdminPinChange = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!currentAdminPin.trim() || !newAdminPin.trim()) {
+      await showAlert("Please enter your current PIN and new PIN.", { type: "warning" });
+      return;
+    }
+    if (newAdminPin.length < 4 || newAdminPin.length > 6) {
+      await showAlert("New PIN must be 4 to 6 digits.", { type: "warning" });
+      return;
+    }
+    if (newAdminPin !== confirmAdminPin) {
+      await showAlert("New PIN and Confirm PIN do not match.", { type: "warning" });
+      return;
+    }
+
+    setIsChangingAdminPin(true);
+    const res = await updateUserPin(newAdminPin, currentAdminPin);
+    setIsChangingAdminPin(false);
+
+    if (res.success) {
+      setCurrentAdminPin("");
+      setNewAdminPin("");
+      setConfirmAdminPin("");
+      await showAlert("Admin PIN updated successfully! Remember to use your new PIN on your next login.", {
+        title: "PIN Updated",
+        type: "success",
+      });
+    } else {
+      await showAlert(res.error || "Failed to update PIN.", {
+        title: "Error",
+        type: "error",
+      });
+    }
+  };
+
+  const handleCashierPinChange = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newCashierPin.trim()) {
+      await showAlert("Please enter a new PIN for Cashier/Staff.", { type: "warning" });
+      return;
+    }
+    if (newCashierPin.length < 4 || newCashierPin.length > 6) {
+      await showAlert("Cashier PIN must be 4 to 6 digits.", { type: "warning" });
+      return;
+    }
+
+    setIsChangingCashierPin(true);
+    const res = await updateUserPin(newCashierPin, undefined, "usr-staff");
+    setIsChangingCashierPin(false);
+
+    if (res.success) {
+      setNewCashierPin("");
+      await showAlert("Cashier / Staff PIN updated successfully!", {
+        title: "Staff PIN Updated",
+        type: "success",
+      });
+    } else {
+      await showAlert(res.error || "Failed to update Cashier PIN.", {
+        title: "Error",
+        type: "error",
+      });
+    }
+  };
 
   const handleSaveSettings = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -355,6 +432,118 @@ export function SettingsView() {
             </button>
           </div>
         </form>
+      </div>
+
+      {/* System Security & PIN Management */}
+      <div className="bg-white rounded-lg border border-slate-200 shadow-2xs p-4 space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-b border-slate-200 pb-3">
+          <div>
+            <h3 className="font-bold text-xs uppercase tracking-wider text-slate-800 flex items-center gap-1.5">
+              <ShieldCheck className="w-4 h-4 text-emerald-600" />
+              <span>Security &amp; PIN Management (নিরাপত্তা ও পিন পরিবর্তন)</span>
+            </h3>
+            <p className="text-[11px] text-slate-500 mt-0.5">
+              Secure your software before going public. Change the default 4-digit PINs to private passwords.
+            </p>
+          </div>
+          <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-[11px] text-emerald-800 font-medium">
+            <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+            <span>PBKDF2 Hashed &amp; Session Guard Active</span>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Change Admin PIN */}
+          <form onSubmit={handleAdminPinChange} className="bg-slate-50 border border-slate-200 rounded-lg p-3.5 space-y-3">
+            <div className="flex items-center gap-2 text-xs font-bold text-slate-900">
+              <KeyRound className="w-4 h-4 text-amber-600" />
+              <span>Change Admin / Proprietor PIN</span>
+            </div>
+            <p className="text-[11px] text-slate-500 leading-tight">
+              Updates your master admin PIN for full system access and profit reports.
+            </p>
+
+            <div className="space-y-2">
+              <div>
+                <label className="text-[10px] font-semibold text-slate-600 block mb-0.5">Current Admin PIN:</label>
+                <input
+                  type="password"
+                  maxLength={6}
+                  placeholder="Enter current PIN"
+                  value={currentAdminPin}
+                  onChange={(e) => setCurrentAdminPin(e.target.value)}
+                  className="w-full bg-white border border-slate-300 rounded px-2.5 py-1.5 text-xs font-mono font-bold focus:ring-1 focus:ring-slate-900"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-[10px] font-semibold text-slate-600 block mb-0.5">New PIN (4-6 digits):</label>
+                  <input
+                    type="password"
+                    maxLength={6}
+                    placeholder="New PIN"
+                    value={newAdminPin}
+                    onChange={(e) => setNewAdminPin(e.target.value)}
+                    className="w-full bg-white border border-slate-300 rounded px-2.5 py-1.5 text-xs font-mono font-bold focus:ring-1 focus:ring-slate-900"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] font-semibold text-slate-600 block mb-0.5">Confirm New PIN:</label>
+                  <input
+                    type="password"
+                    maxLength={6}
+                    placeholder="Confirm PIN"
+                    value={confirmAdminPin}
+                    onChange={(e) => setConfirmAdminPin(e.target.value)}
+                    className="w-full bg-white border border-slate-300 rounded px-2.5 py-1.5 text-xs font-mono font-bold focus:ring-1 focus:ring-slate-900"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <button
+              type="submit"
+              disabled={isChangingAdminPin}
+              className="w-full py-1.5 bg-slate-900 hover:bg-slate-800 disabled:opacity-60 text-white rounded text-xs font-semibold transition cursor-pointer disabled:cursor-not-allowed"
+            >
+              {isChangingAdminPin ? "Updating..." : "Update Admin PIN"}
+            </button>
+          </form>
+
+          {/* Change Cashier / Staff PIN */}
+          <form onSubmit={handleCashierPinChange} className="bg-slate-50 border border-slate-200 rounded-lg p-3.5 space-y-3 flex flex-col justify-between">
+            <div className="space-y-3">
+              <div className="flex items-center gap-2 text-xs font-bold text-slate-900">
+                <Lock className="w-4 h-4 text-cyan-600" />
+                <span>Reset Cashier / Staff PIN</span>
+              </div>
+              <p className="text-[11px] text-slate-500 leading-tight">
+                Set a secure PIN for staff members operating the POS sales counter.
+              </p>
+
+              <div>
+                <label className="text-[10px] font-semibold text-slate-600 block mb-0.5">New Cashier PIN (4-6 digits):</label>
+                <input
+                  type="password"
+                  maxLength={6}
+                  placeholder="Enter new 4-digit PIN"
+                  value={newCashierPin}
+                  onChange={(e) => setNewCashierPin(e.target.value)}
+                  className="w-full bg-white border border-slate-300 rounded px-2.5 py-1.5 text-xs font-mono font-bold focus:ring-1 focus:ring-slate-900"
+                />
+              </div>
+            </div>
+
+            <button
+              type="submit"
+              disabled={isChangingCashierPin}
+              className="w-full py-1.5 bg-slate-800 hover:bg-slate-700 disabled:opacity-60 text-white rounded text-xs font-semibold transition cursor-pointer disabled:cursor-not-allowed mt-2"
+            >
+              {isChangingCashierPin ? "Updating..." : "Update Cashier PIN"}
+            </button>
+          </form>
+        </div>
       </div>
 
       {/* Database Daily Backups to DB */}

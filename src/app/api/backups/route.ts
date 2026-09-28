@@ -1,8 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query } from "@/lib/db";
+import { verifyAuth } from "@/lib/auth";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
+    const auth = await verifyAuth(req, { requiredRole: "admin" });
+    if (!auth.success) return auth.response;
+
     const rows = await query(
       `SELECT id, backup_date as "backupDate", backup_type as "backupType", 
               summary, notes, created_at as "createdAt"
@@ -19,6 +23,9 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   try {
+    const auth = await verifyAuth(req, { requiredRole: "admin" });
+    if (!auth.success) return auth.response;
+
     const body = await req.json().catch(() => ({}));
     const backupType = body.backupType || "manual";
     const notes = body.notes || (backupType === "auto_daily" ? "Automated Daily Database Snapshot" : "Manual On-Demand Backup Snapshot");

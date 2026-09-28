@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useState, useEffect } from "react";
+import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
 import {
   Product,
   Customer,
@@ -39,9 +39,9 @@ interface StoreContextType {
   dailyBackups: DailyBackup[];
 
   // Auth Actions
-  login: (username: string, pin: string) => boolean;
-  logout: () => void;
-  updateUserPin: (userId: string, newPin: string) => boolean;
+  login: (username: string, pin: string) => Promise<{ success: boolean; error?: string }>;
+  logout: () => Promise<void>;
+  updateUserPin: (newPin: string, currentPin?: string, targetUserId?: string) => Promise<{ success: boolean; error?: string }>;
 
   // Product Actions
   addProduct: (product: Omit<Product, "id" | "createdAt" | "updatedAt">) => Product;
@@ -138,7 +138,68 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const [dailyBackups, setDailyBackups] = useState<DailyBackup[]>([]);
   const [selectedDate, setSelectedDate] = useState<string>(getTodayDateString());
 
-  const resetSelectedDate = () => setSelectedDate(getTodayDateString());
+  const syncLiveStoreData = useCallback((userRole?: string) => {
+    const fetchPromises = [
+      fetch("/api/products").then((r) => (r.ok ? r.json() : null)),
+      fetch("/api/customers").then((r) => (r.ok ? r.json() : null)),
+      fetch("/api/sales").then((r) => (r.ok ? r.json() : null)),
+      fetch("/api/returns").then((r) => (r.ok ? r.json() : null)),
+      fetch("/api/due-payments").then((r) => (r.ok ? r.json() : null)),
+      fetch("/api/expenses").then((r) => (r.ok ? r.json() : null)),
+      fetch("/api/publishers").then((r) => (r.ok ? r.json() : null)),
+    ];
+
+    if (userRole === "admin") {
+      fetchPromises.push(
+        fetch("/api/backups").then((r) => (r.ok ? r.json() : null))
+      );
+    }
+
+    Promise.allSettled(fetchPromises).then(([pRes, cRes, sRes, rRes, dRes, eRes, pubRes, bkpRes]) => {
+      if (pRes?.status === "fulfilled" && Array.isArray(pRes.value) && pRes.value.length > 0) {
+        setProducts(pRes.value);
+      }
+      if (cRes?.status === "fulfilled" && Array.isArray(cRes.value) && cRes.value.length > 0) {
+        setCustomers(cRes.value);
+      }
+      if (sRes?.status === "fulfilled" && Array.isArray(sRes.value)) {
+        setSales(sRes.value);
+      }
+      if (rRes?.status === "fulfilled" && Array.isArray(rRes.value)) {
+        setReturns(rRes.value);
+      }
+      if (dRes?.status === "fulfilled" && Array.isArray(dRes.value)) {
+        setDuePayments(dRes.value);
+      }
+      if (eRes?.status === "fulfilled" && Array.isArray(eRes.value)) {
+        setExpenses(eRes.value);
+      }
+      if (pubRes?.status === "fulfilled" && Array.isArray(pubRes.value) && pubRes.value.length > 0) {
+        setPublishers(pubRes.value);
+      }
+      if (bkpRes && bkpRes.status === "fulfilled" && Array.isArray(bkpRes.value)) {
+        setDailyBackups(bkpRes.value);
+      }
+
+      // If admin, trigger daily auto-backup to Supabase silently
+      if (userRole === "admin") {
+        fetch("/api/backups", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ backupType: "auto_daily" }),
+        })
+          .then((res) => res.json())
+          .then((data) => {
+            if (data?.backup) {
+              setDailyBackups((prev) => [data.backup, ...prev.filter((b) => b.id !== data.backup.id)]);
+            }
+          })
+          .catch(() => {});
+      }
+    }).catch((err) => {
+      console.warn("Live store sync fallback:", err);
+    });
+  }, []);
 
   // Load from LocalStorage on mount
   useEffect(() => {
@@ -203,60 +264,39 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       setUsers(loadedUsers);
 
       if (storedCurrentUser) {
-        setCurrentUser(JSON.parse(storedCurrentUser));
+        try {
+          setCurrentUser(JSON.parse(storedCurrentUser));
+        } catch {
+          setCurrentUser(null);
+        }
       } else {
         setCurrentUser(null);
       }
 
-      // Live asynchronous sync with Supabase PostgreSQL Database
-      Promise.allSettled([
-        fetch("/api/products").then((r) => r.json()),
-        fetch("/api/customers").then((r) => r.json()),
-        fetch("/api/sales").then((r) => r.json()),
-        fetch("/api/returns").then((r) => r.json()),
-        fetch("/api/due-payments").then((r) => r.json()),
-        fetch("/api/expenses").then((r) => r.json()),
-        fetch("/api/publishers").then((r) => r.json()),
-        fetch("/api/backups").then((r) => r.json()),
-      ]).then(([pRes, cRes, sRes, rRes, dRes, eRes, pubRes, bkpRes]) => {
-        if (pRes.status === "fulfilled" && Array.isArray(pRes.value) && pRes.value.length > 0) {
-          setProducts(pRes.value);
-        }
-        if (cRes.status === "fulfilled" && Array.isArray(cRes.value) && cRes.value.length > 0) {
-          setCustomers(cRes.value);
-        }
-        if (sRes.status === "fulfilled" && Array.isArray(sRes.value)) {
-          setSales(sRes.value);
-        }
-        if (rRes.status === "fulfilled" && Array.isArray(rRes.value)) {
-          setReturns(rRes.value);
-        }
-        if (dRes.status === "fulfilled" && Array.isArray(dRes.value)) {
-          setDuePayments(dRes.value);
-        }
-        if (eRes.status === "fulfilled" && Array.isArray(eRes.value)) {
-          setExpenses(eRes.value);
-        }
-        if (pubRes.status === "fulfilled" && Array.isArray(pubRes.value) && pubRes.value.length > 0) {
-          setPublishers(pubRes.value);
-        }
-        if (bkpRes.status === "fulfilled" && Array.isArray(bkpRes.value)) {
-          setDailyBackups(bkpRes.value);
-        }
-
-        // Trigger daily auto-backup to Supabase silently
-        fetch("/api/backups", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ backupType: "auto_daily" }),
-        }).then(res => res.json()).then(data => {
-          if (data?.backup) {
-            setDailyBackups(prev => [data.backup, ...prev.filter(b => b.id !== data.backup.id)]);
+      // Verify session with server and only sync protected data if authenticated
+      fetch("/api/auth/me")
+        .then((r) => r.json())
+        .then((data) => {
+          if (data.authenticated && data.user) {
+            setCurrentUser(data.user);
+            localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(data.user));
+            syncLiveStoreData(data.user.role);
+          } else {
+            setCurrentUser(null);
+            localStorage.removeItem(STORAGE_KEYS.CURRENT_USER);
           }
-        }).catch(() => {});
-      }).catch((err) => {
-        console.warn("Supabase initial fetch fallback to local cache:", err);
-      });
+        })
+        .catch(() => {
+          if (storedCurrentUser) {
+            try {
+              const u = JSON.parse(storedCurrentUser);
+              setCurrentUser(u);
+              syncLiveStoreData(u.role);
+            } catch {
+              setCurrentUser(null);
+            }
+          }
+        });
     } catch (e) {
       console.error("Failed to load storage data:", e);
       setProducts(initialProducts);
@@ -268,6 +308,69 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setIsHydrated(true);
     }
+  }, []);
+
+  const syncLiveStoreData = useCallback((userRole?: string) => {
+    const fetchPromises = [
+      fetch("/api/products").then((r) => (r.ok ? r.json() : null)),
+      fetch("/api/customers").then((r) => (r.ok ? r.json() : null)),
+      fetch("/api/sales").then((r) => (r.ok ? r.json() : null)),
+      fetch("/api/returns").then((r) => (r.ok ? r.json() : null)),
+      fetch("/api/due-payments").then((r) => (r.ok ? r.json() : null)),
+      fetch("/api/expenses").then((r) => (r.ok ? r.json() : null)),
+      fetch("/api/publishers").then((r) => (r.ok ? r.json() : null)),
+    ];
+
+    if (userRole === "admin") {
+      fetchPromises.push(
+        fetch("/api/backups").then((r) => (r.ok ? r.json() : null))
+      );
+    }
+
+    Promise.allSettled(fetchPromises).then(([pRes, cRes, sRes, rRes, dRes, eRes, pubRes, bkpRes]) => {
+      if (pRes?.status === "fulfilled" && Array.isArray(pRes.value) && pRes.value.length > 0) {
+        setProducts(pRes.value);
+      }
+      if (cRes?.status === "fulfilled" && Array.isArray(cRes.value) && cRes.value.length > 0) {
+        setCustomers(cRes.value);
+      }
+      if (sRes?.status === "fulfilled" && Array.isArray(sRes.value)) {
+        setSales(sRes.value);
+      }
+      if (rRes?.status === "fulfilled" && Array.isArray(rRes.value)) {
+        setReturns(rRes.value);
+      }
+      if (dRes?.status === "fulfilled" && Array.isArray(dRes.value)) {
+        setDuePayments(dRes.value);
+      }
+      if (eRes?.status === "fulfilled" && Array.isArray(eRes.value)) {
+        setExpenses(eRes.value);
+      }
+      if (pubRes?.status === "fulfilled" && Array.isArray(pubRes.value) && pubRes.value.length > 0) {
+        setPublishers(pubRes.value);
+      }
+      if (bkpRes && bkpRes.status === "fulfilled" && Array.isArray(bkpRes.value)) {
+        setDailyBackups(bkpRes.value);
+      }
+
+      // If admin, trigger daily auto-backup to Supabase silently
+      if (userRole === "admin") {
+        fetch("/api/backups", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ backupType: "auto_daily" }),
+        })
+          .then((res) => res.json())
+          .then((data) => {
+            if (data?.backup) {
+              setDailyBackups((prev) => [data.backup, ...prev.filter((b) => b.id !== data.backup.id)]);
+            }
+          })
+          .catch(() => {});
+      }
+    }).catch((err) => {
+      console.warn("Live store sync fallback:", err);
+    });
   }, []);
 
   // Save to LocalStorage whenever state changes
@@ -295,34 +398,71 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   }, [products, customers, sales, returns, duePayments, expenses, settings, users, currentUser, publishers, dailyBackups, isHydrated]);
 
   // Auth Methods
-  const login = (username: string, pin: string): boolean => {
-    const cleanUser = username.trim().toLowerCase();
-    const cleanPin = pin.trim();
-    const matched = users.find(
-      (u) => (u.username.toLowerCase() === cleanUser || u.role.toLowerCase() === cleanUser) && u.pin === cleanPin
-    );
-    if (matched) {
-      setCurrentUser(matched);
-      localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(matched));
-      return true;
+  const login = async (
+    username: string,
+    pin: string
+  ): Promise<{ success: boolean; error?: string }> => {
+    try {
+      const res = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, pin }),
+      });
+      const data = await res.json();
+      if (res.ok && data.success && data.user) {
+        setCurrentUser(data.user);
+        localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(data.user));
+        syncLiveStoreData(data.user.role);
+        return { success: true };
+      }
+      return {
+        success: false,
+        error: data.error || "Invalid username or PIN code.",
+      };
+    } catch (err: any) {
+      console.error("Login failed:", err);
+      return {
+        success: false,
+        error: err?.message || "Authentication network error.",
+      };
     }
-    return false;
   };
 
-  const logout = () => {
+  const logout = async () => {
+    try {
+      await fetch("/api/auth/logout", { method: "POST" });
+    } catch (err) {
+      console.error("Logout error:", err);
+    }
     setCurrentUser(null);
     localStorage.removeItem(STORAGE_KEYS.CURRENT_USER);
   };
 
-  const updateUserPin = (userId: string, newPin: string): boolean => {
-    if (!newPin || newPin.length < 4) return false;
-    setUsers((prev) =>
-      prev.map((u) => (u.id === userId ? { ...u, pin: newPin } : u))
-    );
-    if (currentUser?.id === userId) {
-      setCurrentUser((prev) => (prev ? { ...prev, pin: newPin } : null));
+  const updateUserPin = async (
+    newPin: string,
+    currentPin?: string,
+    targetUserId?: string
+  ): Promise<{ success: boolean; error?: string }> => {
+    try {
+      const res = await fetch("/api/auth/change-pin", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ newPin, currentPin, targetUserId }),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        return { success: true };
+      }
+      return {
+        success: false,
+        error: data.error || "Failed to update PIN.",
+      };
+    } catch (err: any) {
+      return {
+        success: false,
+        error: err?.message || "Network error updating PIN.",
+      };
     }
-    return true;
   };
 
   // Product Actions

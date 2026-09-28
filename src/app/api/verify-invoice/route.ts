@@ -1,11 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query } from "@/lib/db";
+import { checkRateLimit, getClientIp } from "@/lib/rateLimit";
 
 // Public, unauthenticated lookup used by the /verify page. Only returns the
 // fields needed to prove an invoice is genuine - no cost/profit or full
 // customer ledger data, unlike the internal /api/sales endpoint.
 export async function GET(req: NextRequest) {
   try {
+    const ip = getClientIp(req);
+    const rateCheck = checkRateLimit(`verify:${ip}`, 60, 60);
+    if (!rateCheck.allowed) {
+      return NextResponse.json(
+        { error: "Too many verification requests. Please try again shortly." },
+        { status: 429, headers: { "Retry-After": String(rateCheck.retryAfterSeconds) } }
+      );
+    }
+
     const invoiceNo = req.nextUrl.searchParams.get("invoiceNo")?.trim();
     if (!invoiceNo) {
       return NextResponse.json({ error: "invoiceNo is required" }, { status: 400 });

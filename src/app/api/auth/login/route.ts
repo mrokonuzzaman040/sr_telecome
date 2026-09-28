@@ -12,20 +12,6 @@ export async function POST(req: NextRequest) {
   try {
     const ip = getClientIp(req);
 
-    // Rate limiting: Maximum 5 attempts per 5 minutes per IP to block brute-force attacks
-    const rateCheck = checkRateLimit(`login:${ip}`, 5, 300);
-    if (!rateCheck.allowed) {
-      return NextResponse.json(
-        {
-          error: `Too many login attempts. Please wait ${rateCheck.retryAfterSeconds} seconds before trying again.`,
-        },
-        {
-          status: 429,
-          headers: { "Retry-After": String(rateCheck.retryAfterSeconds) },
-        }
-      );
-    }
-
     const body = await req.json().catch(() => ({}));
     const { username, pin } = body;
 
@@ -38,6 +24,23 @@ export async function POST(req: NextRequest) {
 
     const cleanUser = String(username).trim().toLowerCase();
     const cleanPin = String(pin).trim();
+
+    // Rate limiting: 5 attempts / 5 min per IP, and separately per-username so
+    // an attacker can't evade the IP limit by rotating IPs against one account.
+    const ipRateCheck = checkRateLimit(`login:ip:${ip}`, 5, 300);
+    const userRateCheck = checkRateLimit(`login:user:${cleanUser}`, 5, 300);
+    const rateCheck = ipRateCheck.allowed ? userRateCheck : ipRateCheck;
+    if (!rateCheck.allowed) {
+      return NextResponse.json(
+        {
+          error: `Too many login attempts. Please wait ${rateCheck.retryAfterSeconds} seconds before trying again.`,
+        },
+        {
+          status: 429,
+          headers: { "Retry-After": String(rateCheck.retryAfterSeconds) },
+        }
+      );
+    }
 
     // Query real Supabase PostgreSQL users table
     const rows = await query(
@@ -53,8 +56,10 @@ export async function POST(req: NextRequest) {
       const isMatch = verifyPin(cleanPin, dbUser.pin);
 
       if (isMatch) {
-        // Transparently upgrade legacy plaintext PIN to cryptographically hashed PBKDF2
-        if (!dbUser.pin.startsWith("pbkdf2$")) {
+        // Transparently upgrade legacy plaintext PINs and old low-iteration
+        // PBKDF2 hashes to the current hashPin() iteration count.
+        const currentIterations = parseInt(dbUser.pin.split("$")[1], 10);
+        if (!dbUser.pin.startsWith("pbkdf2$") || currentIterations < 600_000) {
           query(`UPDATE users SET pin = $1 WHERE id = $2`, [
             hashPin(cleanPin),
             dbUser.id,

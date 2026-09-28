@@ -11,12 +11,18 @@ export interface SessionPayload {
 
 export const SESSION_COOKIE_NAME = "sr_session_token";
 
-// Dynamic or configured secret key for HMAC token signing
-const AUTH_SECRET =
-  process.env.AUTH_SECRET ||
-  process.env.NEXTAUTH_SECRET ||
-  process.env.SUPABASE_SERVICE_ROLE_KEY ||
-  "sr-telecom-pos-production-secret-hmac-key-2026!";
+// Secret key for HMAC token signing. Must be set explicitly per environment;
+// there is no hardcoded fallback since that would let anyone forge session
+// tokens by reading this file.
+const _rawAuthSecret = process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET;
+
+if (!_rawAuthSecret || _rawAuthSecret.length < 32) {
+  throw new Error(
+    "AUTH_SECRET (or NEXTAUTH_SECRET) env var must be set to a random value of at least 32 characters. Generate one with: openssl rand -base64 48"
+  );
+}
+
+const AUTH_SECRET: string = _rawAuthSecret;
 
 /**
  * Signs a tamper-proof session token.
@@ -172,12 +178,14 @@ export function clearSessionCookie(res: NextResponse) {
 /**
  * Hashes a PIN using PBKDF2 with a cryptographic salt.
  */
+const PBKDF2_ITERATIONS = 600_000; // OWASP-recommended minimum for PBKDF2-SHA256
+
 export function hashPin(pin: string): string {
   const salt = crypto.randomBytes(16).toString("hex");
   const hash = crypto
-    .pbkdf2Sync(pin, salt, 10000, 32, "sha256")
+    .pbkdf2Sync(pin, salt, PBKDF2_ITERATIONS, 32, "sha256")
     .toString("hex");
-  return `pbkdf2$10000$${salt}$${hash}`;
+  return `pbkdf2$${PBKDF2_ITERATIONS}$${salt}$${hash}`;
 }
 
 /**

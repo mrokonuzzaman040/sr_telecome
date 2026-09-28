@@ -8,18 +8,21 @@ interface RateLimitRecord {
 const rateLimitMap = new Map<string, RateLimitRecord>();
 
 /**
- * Extracts client IP address reliably across proxies/CDNs (Vercel, Cloudflare, Nginx).
+ * Extracts client IP address for rate-limiting purposes.
+ *
+ * `x-forwarded-for` / `x-real-ip` / `cf-connecting-ip` are client-settable
+ * headers and must never be trusted directly - an attacker can set any value
+ * to always land in someone else's rate-limit bucket, or rotate values to
+ * evade their own limit entirely. `x-vercel-forwarded-for` is instead set by
+ * Vercel's edge network itself and cannot be overridden by the client, so it
+ * is the only source trusted here. If it is absent (e.g. running outside
+ * Vercel), every request collapses to one shared "unknown" bucket - safe
+ * (fails toward more restrictive, shared limiting) rather than spoofable.
  */
 export function getClientIp(req: NextRequest): string {
-  const forwarded = req.headers.get("x-forwarded-for");
-  if (forwarded) {
-    return forwarded.split(",")[0].trim();
-  }
-  const realIp = req.headers.get("x-real-ip");
-  if (realIp) return realIp.trim();
-  const cfIp = req.headers.get("cf-connecting-ip");
-  if (cfIp) return cfIp.trim();
-  return "127.0.0.1";
+  const vercelIp = req.headers.get("x-vercel-forwarded-for");
+  if (vercelIp) return vercelIp.split(",")[0].trim();
+  return "unknown";
 }
 
 /**

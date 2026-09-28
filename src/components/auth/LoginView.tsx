@@ -21,7 +21,9 @@ export function LoginView() {
   const [errorMsg, setErrorMsg] = useState("");
   const [showPin, setShowPin] = useState(false);
 
-  const handleLogin = (e: React.FormEvent) => {
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg("");
 
@@ -30,9 +32,12 @@ export function LoginView() {
       return;
     }
 
-    const success = login(username, pin);
-    if (!success) {
-      setErrorMsg("Invalid username or PIN code. Please try again.");
+    setIsSubmitting(true);
+    const result = await login(username, pin);
+    setIsSubmitting(false);
+
+    if (!result.success) {
+      setErrorMsg(result.error || "Invalid username or PIN code. Please try again.");
     }
   };
 
@@ -195,9 +200,10 @@ export function LoginView() {
 
             <button
               type="submit"
-              className="w-full py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg font-semibold text-xs transition shadow-md flex items-center justify-center gap-2"
+              disabled={isSubmitting}
+              className="w-full py-2.5 bg-slate-900 hover:bg-slate-800 disabled:opacity-60 text-white rounded-lg font-semibold text-xs transition shadow-md flex items-center justify-center gap-2 cursor-pointer disabled:cursor-not-allowed"
             >
-              <span>Unlock & Enter Dashboard</span>
+              <span>{isSubmitting ? "Authenticating..." : "Unlock & Enter Dashboard"}</span>
               <ArrowRight className="w-4 h-4" />
             </button>
           </form>
