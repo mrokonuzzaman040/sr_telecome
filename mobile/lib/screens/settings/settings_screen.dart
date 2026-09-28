@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
-import '../../providers/store_provider.dart';
 import '../../providers/theme_provider.dart';
 import '../../providers/language_provider.dart';
 import '../../services/biometric_service.dart';
@@ -67,7 +66,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
   @override
   Widget build(BuildContext context) {
     final auth = Provider.of<AuthProvider>(context);
-    final store = Provider.of<StoreProvider>(context);
     final languageProvider = Provider.of<LanguageProvider>(context);
     final loc = AppLocalizations.of(languageProvider.currentLocale);
     final user = auth.currentUser;

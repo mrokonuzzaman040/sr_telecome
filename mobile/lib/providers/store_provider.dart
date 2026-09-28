@@ -379,7 +379,7 @@ class StoreProvider extends ChangeNotifier {
     if (customer != null) {
       _customerType = customer.type;
       if (customer.type == 'agent') {
-        _agentCommissionRate = customer.defaultCommissionRate ?? 30.0;
+        _agentCommissionRate = customer.defaultCommissionRate;
       }
     } else {
       _customerType = 'single';

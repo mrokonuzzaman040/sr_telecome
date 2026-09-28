@@ -56,7 +56,7 @@ class _ReturnFormScreenState extends State<ReturnFormScreen> {
 
   double _getDefaultCommissionRate() {
     if (_selectedCustomer != null && _selectedCustomer!.type == 'agent') {
-      return _selectedCustomer!.defaultCommissionRate ?? 30.0;
+      return _selectedCustomer!.defaultCommissionRate;
     }
     return 0.0;
   }

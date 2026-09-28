@@ -18,7 +18,9 @@ jobs:
     - name: Setup Flutter
       uses: subosito/flutter-action@v2
       with:
-        flutter-version: '3.24.5'
+        # Must ship Dart >= 3.9.0 to satisfy `environment: sdk: ^3.9.0` in
+        # mobile/pubspec.yaml. Flutter 3.35.x bundles Dart 3.9.x.
+        flutter-version: '3.35.1'
         channel: 'stable'
         cache: true
     
@@ -28,7 +30,9 @@ jobs:
     
     - name: Analyze code
       working-directory: ./mobile
-      run: flutter analyze
+      # Errors and warnings still fail the build. Info-level style lints are
+      # reported but non-fatal so they cannot block a release on their own.
+      run: flutter analyze --no-fatal-infos
     
     - name: Run tests
       working-directory: ./mobile

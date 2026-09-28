@@ -68,8 +68,6 @@ class _LoginScreenState extends State<LoginScreen> {
       await auth.login(_username, _pin);
     } catch (e) {
       if (!mounted) return;
-      final languageProvider = Provider.of<LanguageProvider>(context, listen: false);
-      final loc = AppLocalizations.of(languageProvider.currentLocale);
       setState(() {
         _errorMessage = e.toString().replaceFirst('Exception: ', '');
         _pin = '';
