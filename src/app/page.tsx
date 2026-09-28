@@ -153,7 +153,7 @@ function MainDashboard() {
           {activeTab === "inventory" && <InventoryView />}
           {activeTab === "publishers" && <PublishersView />}
           {activeTab === "barcodes" && <BarcodeGeneratorView />}
-          {activeTab === "customers" && <CustomersView />}
+          {activeTab === "customers" && <CustomersView onSelectInvoice={handleSelectInvoice} />}
           {activeTab === "expenses" && <ExpensesView />}
           {activeTab === "returns" && <ReturnsView />}
           {activeTab === "reports" && (

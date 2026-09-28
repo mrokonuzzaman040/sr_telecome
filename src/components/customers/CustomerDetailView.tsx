@@ -182,11 +182,12 @@ export function CustomerDetailView({ customer, onBack, onSelectInvoice }: Custom
         </div>
       )}
 
+      <div className="no-print space-y-4">
       {/* Back Nav */}
       <button
         type="button"
         onClick={onBack}
-        className="no-print inline-flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-800 transition"
+        className="inline-flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-800 transition"
       >
         <ArrowLeft className="w-3.5 h-3.5" />
         <span>গ্রাহক তালিকায় ফিরুন (Back to Ledger)</span>
@@ -566,6 +567,7 @@ export function CustomerDetailView({ customer, onBack, onSelectInvoice }: Custom
             </table>
           </div>
         )}
+      </div>
       </div>
     </div>
   );
