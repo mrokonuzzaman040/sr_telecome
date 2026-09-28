@@ -4,10 +4,11 @@ import 'package:intl/intl.dart';
 import '../../providers/store_provider.dart';
 import '../../models/customer.dart';
 import '../../models/sale.dart';
-import '../../services/printer_service.dart';
 import '../../providers/auth_provider.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/invoice_preview_sheet.dart';
+import '../../services/pdf_invoice_service.dart';
+import '../returns/return_form_screen.dart';
 
 class CartModal extends StatefulWidget {
   const CartModal({super.key});
@@ -19,7 +20,8 @@ class CartModal extends StatefulWidget {
 class _CartModalState extends State<CartModal> {
   final currencyFormat = NumberFormat('#,##0', 'en_US');
   final TextEditingController _paidController = TextEditingController();
-  final TextEditingController _discountController = TextEditingController();
+  final TextEditingController _agentCommController = TextEditingController();
+  final TextEditingController _retailDiscountController = TextEditingController();
   bool _isProcessing = false;
 
   @override
@@ -27,14 +29,85 @@ class _CartModalState extends State<CartModal> {
     super.initState();
     final store = Provider.of<StoreProvider>(context, listen: false);
     _paidController.text = store.cartPayable.toStringAsFixed(0);
-    _discountController.text = store.customDiscount.toStringAsFixed(0);
+    _agentCommController.text = store.agentCommissionRate.toInt().toString();
+    _retailDiscountController.text = store.retailDiscountValue.toInt().toString();
   }
 
   @override
   void dispose() {
     _paidController.dispose();
-    _discountController.dispose();
+    _agentCommController.dispose();
+    _retailDiscountController.dispose();
     super.dispose();
+  }
+
+  void _syncPaidController() {
+    final store = Provider.of<StoreProvider>(context, listen: false);
+    if (store.paymentMethod != 'due') {
+      _paidController.text = store.cartPayable.toStringAsFixed(0);
+    }
+  }
+
+  void _showItemPriceEditDialog(SaleItem item) {
+    final store = Provider.of<StoreProvider>(context, listen: false);
+    final commCtrl = TextEditingController(text: (item.commissionRate ?? 0).toInt().toString());
+    final priceCtrl = TextEditingController(text: item.unitPrice.toInt().toString());
+    final mrp = item.mrp;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('${item.productName} - দর ও কমিশন', style: const TextStyle(fontSize: 15)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('গায়ের মূল্য (MRP): ৳${mrp.toInt()}', style: const TextStyle(fontWeight: FontWeight.bold)),
+            const SizedBox(height: 12),
+            TextField(
+              controller: commCtrl,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(labelText: 'কমিশন (%)', suffixText: '%'),
+              onChanged: (val) {
+                final rate = double.tryParse(val) ?? 0.0;
+                final newPrice = (mrp - (mrp * rate / 100.0)).clamp(0.0, double.infinity);
+                priceCtrl.text = newPrice.toInt().toString();
+              },
+            ),
+            const SizedBox(height: 10),
+            TextField(
+              controller: priceCtrl,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(labelText: 'একক বিক্রয় দর (Unit Price)', prefixText: '৳ '),
+              onChanged: (val) {
+                final p = double.tryParse(val) ?? 0.0;
+                if (mrp > 0) {
+                  final rate = ((mrp - p) / mrp * 100.0).clamp(0.0, 100.0);
+                  commCtrl.text = rate.toInt().toString();
+                }
+              },
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('বাতিল')),
+          ElevatedButton(
+            onPressed: () {
+              final newRate = double.tryParse(commCtrl.text) ?? 0.0;
+              final newPrice = double.tryParse(priceCtrl.text) ?? item.unitPrice;
+              if (newRate > 0) {
+                store.updateCartItemCommission(item.productId, newRate);
+              } else {
+                store.updateCartItemUnitPrice(item.productId, newPrice);
+              }
+              _syncPaidController();
+              Navigator.pop(ctx);
+            },
+            child: const Text('সংরক্ষণ'),
+          ),
+        ],
+      ),
+    );
   }
 
   void _onCheckout() async {
@@ -68,7 +141,7 @@ class _CartModalState extends State<CartModal> {
       if (!mounted) return;
       Navigator.pop(context); // Close cart
 
-      // Show Invoice confirmation
+      // Show Invoice confirmation with the 2 Print Options
       showDialog(
         context: context,
         builder: (ctx) => AlertDialog(
@@ -95,8 +168,8 @@ class _CartModalState extends State<CartModal> {
               child: const Text('ঠিক আছে'),
             ),
             OutlinedButton.icon(
-              icon: const Icon(Icons.receipt_long, size: 18),
-              label: const Text('ইনভয়েস দেখুন'),
+              icon: const Icon(Icons.receipt_long, size: 16),
+              label: const Text('ইনভয়েস'),
               onPressed: () {
                 Navigator.pop(ctx);
                 final isAdmin = Provider.of<AuthProvider>(context, listen: false).isAdmin;
@@ -104,11 +177,20 @@ class _CartModalState extends State<CartModal> {
               },
             ),
             ElevatedButton.icon(
-              icon: const Icon(Icons.print, size: 18),
-              label: const Text('রিসিপ্ট প্রিন্ট'),
+              icon: const Icon(Icons.print, size: 16),
+              label: const Text('১. প্রিন্ট'),
               onPressed: () {
                 Navigator.pop(ctx);
-                _printReceipt(sale);
+                PdfInvoiceService.printSale(context, sale);
+              },
+            ),
+            ElevatedButton.icon(
+              icon: const Icon(Icons.picture_as_pdf, size: 16),
+              label: const Text('২. PDF / শেয়ার'),
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.indigo),
+              onPressed: () {
+                Navigator.pop(ctx);
+                PdfInvoiceService.shareSalePdf(context, sale);
               },
             ),
           ],
@@ -125,26 +207,12 @@ class _CartModalState extends State<CartModal> {
     }
   }
 
-  Future<void> _printReceipt(Sale sale) async {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('প্রিন্টারে রিসিপ্ট পাঠানো হচ্ছে...')),
-    );
-    final ok = await PrinterService.printSaleReceipt(sale);
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(ok ? 'রিসিপ্ট প্রিন্ট হয়েছে' : 'প্রিন্টার সংযুক্ত নেই। সেটিংস থেকে প্রিন্টার সংযুক্ত করুন।'),
-        backgroundColor: ok ? AppTheme.success : AppTheme.danger,
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final store = Provider.of<StoreProvider>(context);
 
     return Container(
-      height: MediaQuery.of(context).size.height * 0.9,
+      height: MediaQuery.of(context).size.height * 0.92,
       decoration: const BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
@@ -161,7 +229,8 @@ class _CartModalState extends State<CartModal> {
               borderRadius: BorderRadius.circular(10),
             ),
           ),
-          // Top bar
+
+          // Top bar with Take Return action
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             child: Row(
@@ -173,14 +242,29 @@ class _CartModalState extends State<CartModal> {
                     const SizedBox(width: 8),
                     Text(
                       'কার্ট তালিকা (${store.cartTotalQuantity} টি)',
-                      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                      style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
                     ),
                   ],
                 ),
-                TextButton.icon(
-                  onPressed: store.cart.isEmpty ? null : store.clearCart,
-                  icon: const Icon(Icons.delete_sweep, color: AppTheme.danger, size: 18),
-                  label: const Text('খালি করুন', style: TextStyle(color: AppTheme.danger)),
+                Row(
+                  children: [
+                    TextButton.icon(
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => const ReturnFormScreen()),
+                        );
+                      },
+                      icon: const Icon(Icons.assignment_return_outlined, color: Colors.orange, size: 17),
+                      label: const Text('রিটার্ন নিন', style: TextStyle(color: Colors.orange, fontSize: 13)),
+                    ),
+                    const SizedBox(width: 4),
+                    TextButton.icon(
+                      onPressed: store.cart.isEmpty ? null : store.clearCart,
+                      icon: const Icon(Icons.delete_sweep, color: AppTheme.danger, size: 17),
+                      label: const Text('খালি', style: TextStyle(color: AppTheme.danger, fontSize: 13)),
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -189,7 +273,7 @@ class _CartModalState extends State<CartModal> {
 
           // Customer selection & type toggle
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             color: Colors.grey.shade50,
             child: Column(
               children: [
@@ -204,7 +288,12 @@ class _CartModalState extends State<CartModal> {
                         selected: {store.customerType},
                         onSelectionChanged: (val) {
                           store.setCustomerType(val.first);
-                          _paidController.text = store.cartPayable.toStringAsFixed(0);
+                          if (val.first == 'agent') {
+                            _agentCommController.text = store.agentCommissionRate.toInt().toString();
+                          } else {
+                            _retailDiscountController.text = store.retailDiscountValue.toInt().toString();
+                          }
+                          _syncPaidController();
                         },
                       ),
                     ),
@@ -227,11 +316,185 @@ class _CartModalState extends State<CartModal> {
                   }).toList(),
                   onChanged: (c) {
                     store.selectCustomer(c);
-                    _paidController.text = store.cartPayable.toStringAsFixed(0);
+                    _agentCommController.text = store.agentCommissionRate.toInt().toString();
+                    _syncPaidController();
                   },
                 ),
               ],
             ),
+          ),
+
+          // --- DYNAMIC COMMISSION & DISCOUNT SECTION ---
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            decoration: BoxDecoration(
+              color: store.customerType == 'agent' ? Colors.indigo.shade50 : Colors.teal.shade50,
+              border: Border(bottom: BorderSide(color: Colors.grey.shade200)),
+            ),
+            child: store.customerType == 'agent'
+                ? Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(Icons.storefront, size: 18, color: Colors.indigo.shade800),
+                              const SizedBox(width: 6),
+                              Text(
+                                'পাইকারি এজেন্ট কমিশন (Wholesale Commission)',
+                                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.indigo.shade900),
+                              ),
+                            ],
+                          ),
+                          SizedBox(
+                            width: 80,
+                            height: 34,
+                            child: TextField(
+                              controller: _agentCommController,
+                              keyboardType: TextInputType.number,
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                              decoration: InputDecoration(
+                                suffixText: '%',
+                                contentPadding: const EdgeInsets.symmetric(vertical: 6, horizontal: 8),
+                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                                isDense: true,
+                              ),
+                              onChanged: (val) {
+                                final r = double.tryParse(val) ?? 0.0;
+                                store.setAgentCommissionRate(r);
+                                _syncPaidController();
+                              },
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      // Quick commission preset chips
+                      Row(
+                        children: [
+                          Text('কমিশন প্রিসেট: ', style: TextStyle(fontSize: 11, color: Colors.indigo.shade700)),
+                          const SizedBox(width: 4),
+                          ...[25, 30, 35, 40, 50].map((rate) {
+                            final isSel = store.agentCommissionRate == rate.toDouble();
+                            return Padding(
+                              padding: const EdgeInsets.only(right: 6),
+                              child: InkWell(
+                                onTap: () {
+                                  _agentCommController.text = rate.toString();
+                                  store.setAgentCommissionRate(rate.toDouble());
+                                  _syncPaidController();
+                                },
+                                borderRadius: BorderRadius.circular(6),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                  decoration: BoxDecoration(
+                                    color: isSel ? Colors.indigo : Colors.white,
+                                    borderRadius: BorderRadius.circular(6),
+                                    border: Border.all(color: Colors.indigo.shade300),
+                                  ),
+                                  child: Text(
+                                    '$rate%',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.bold,
+                                      color: isSel ? Colors.white : Colors.indigo.shade900,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            );
+                          }),
+                        ],
+                      ),
+                    ],
+                  )
+                : Row(
+                    children: [
+                      Row(
+                        children: [
+                          Icon(Icons.percent, size: 18, color: Colors.teal.shade800),
+                          const SizedBox(width: 6),
+                          Text('খুচরা ছাড়:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.teal.shade900)),
+                        ],
+                      ),
+                      const SizedBox(width: 8),
+                      // Percent vs Fixed toggle
+                      Container(
+                        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(6)),
+                        child: Row(
+                          children: [
+                            InkWell(
+                              onTap: () {
+                                store.setRetailDiscountMode('percent');
+                                _syncPaidController();
+                              },
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: store.retailDiscountMode == 'percent' ? Colors.teal : Colors.transparent,
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Text('%', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: store.retailDiscountMode == 'percent' ? Colors.white : Colors.black87)),
+                              ),
+                            ),
+                            InkWell(
+                              onTap: () {
+                                store.setRetailDiscountMode('fixed');
+                                _syncPaidController();
+                              },
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: store.retailDiscountMode == 'fixed' ? Colors.teal : Colors.transparent,
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Text('৳', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: store.retailDiscountMode == 'fixed' ? Colors.white : Colors.black87)),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: SizedBox(
+                          height: 34,
+                          child: TextField(
+                            controller: _retailDiscountController,
+                            keyboardType: TextInputType.number,
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                            decoration: InputDecoration(
+                              contentPadding: const EdgeInsets.symmetric(vertical: 6, horizontal: 8),
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                              isDense: true,
+                            ),
+                            onChanged: (val) {
+                              final d = double.tryParse(val) ?? 0.0;
+                              store.setRetailDiscountValue(d);
+                              _syncPaidController();
+                            },
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      // Round off button
+                      OutlinedButton(
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          minimumSize: const Size(60, 32),
+                        ),
+                        onPressed: () {
+                          store.quickRoundOff();
+                          _retailDiscountController.text = store.retailDiscountValue.toInt().toString();
+                          _syncPaidController();
+                        },
+                        child: const Text('রাউন্ড অফ', style: TextStyle(fontSize: 11)),
+                      ),
+                    ],
+                  ),
           ),
 
           // Cart Items List
@@ -251,21 +514,30 @@ class _CartModalState extends State<CartModal> {
                         child: Row(
                           children: [
                             Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    item.productName,
-                                    style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
-                                    maxLines: 2,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                  const SizedBox(height: 2),
-                                  Text(
-                                    'গায়ের মূল্য: ৳${item.mrp.toInt()}  |  বিক্রয়: ৳${item.unitPrice.toInt()}${item.commissionRate != null ? ' (${item.commissionRate!.toInt()}% ছাড়)' : ''}',
-                                    style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
-                                  ),
-                                ],
+                              child: InkWell(
+                                onTap: () => _showItemPriceEditDialog(item),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      item.productName,
+                                      style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Row(
+                                      children: [
+                                        Text(
+                                          'MRP: ৳${item.mrp.toInt()} | বিক্রয়: ৳${item.unitPrice.toInt()}${item.unitDiscount > 0 ? ' (-৳${item.unitDiscount.toInt()})' : ''}',
+                                          style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                                        ),
+                                        const SizedBox(width: 4),
+                                        const Icon(Icons.edit_note, size: 14, color: AppTheme.primary),
+                                      ],
+                                    ),
+                                  ],
+                                ),
                               ),
                             ),
                             // Qty controls
@@ -275,7 +547,7 @@ class _CartModalState extends State<CartModal> {
                                   icon: const Icon(Icons.remove_circle_outline, size: 22, color: Colors.grey),
                                   onPressed: () {
                                     store.updateCartItemQty(item.productId, item.quantity - 1);
-                                    _paidController.text = store.cartPayable.toStringAsFixed(0);
+                                    _syncPaidController();
                                   },
                                 ),
                                 Text(
@@ -286,14 +558,18 @@ class _CartModalState extends State<CartModal> {
                                   icon: const Icon(Icons.add_circle_outline, size: 22, color: AppTheme.primary),
                                   onPressed: () {
                                     store.updateCartItemQty(item.productId, item.quantity + 1);
-                                    _paidController.text = store.cartPayable.toStringAsFixed(0);
+                                    _syncPaidController();
                                   },
                                 ),
                               ],
                             ),
-                            Text(
-                              '৳${item.total.toInt()}',
-                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                            SizedBox(
+                              width: 70,
+                              child: Text(
+                                '৳${item.total.toInt()}',
+                                textAlign: TextAlign.right,
+                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                              ),
                             ),
                           ],
                         ),
@@ -309,7 +585,7 @@ class _CartModalState extends State<CartModal> {
               color: Colors.white,
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.06),
+                  color: Colors.black.withValues(alpha: 0.06),
                   offset: const Offset(0, -3),
                   blurRadius: 8,
                 ),

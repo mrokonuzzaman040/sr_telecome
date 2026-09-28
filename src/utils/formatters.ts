@@ -39,3 +39,17 @@ export function getTodayDateString(): string {
   const day = String(today.getDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
 }
+
+/**
+ * Extract the local date (YYYY-MM-DD) from an ISO timestamp string.
+ * This is critical for Bangladesh (UTC+6): a sale at 01:00 local time
+ * has a UTC createdAt of the *previous* day, so we must parse in local time.
+ */
+export function getLocalDateFromISO(isoString: string): string {
+  if (!isoString) return "";
+  const d = new Date(isoString);
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
