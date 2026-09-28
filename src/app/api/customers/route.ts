@@ -5,9 +5,9 @@ import { checkRateLimit, getClientIp } from "@/lib/rateLimit";
 
 export async function GET(req: NextRequest) {
   try {
-    // Rate limiting for mobile app data fetching
+    // Strict rate limiting for mobile app data fetching (reduced for Supabase limits)
     const ip = getClientIp(req);
-    const rateLimitResult = checkRateLimit(`customers:${ip}`, 60, 60); // 60 requests per minute
+    const rateLimitResult = checkRateLimit(`customers:${ip}`, 30, 60); // 30 requests per minute
     
     if (!rateLimitResult.allowed) {
       return NextResponse.json(

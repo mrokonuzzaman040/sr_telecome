@@ -16,8 +16,9 @@ export const supabase = createClient(supabaseUrl, supabaseKey, {
 });
 
 // PostgreSQL connection string
+// Use non-pooling connection for mobile apps to avoid Supabase pooler limits
 const connectionString =
-  process.env.POSTGRES_URL_NON_POOLING ||
+  process.env.POSTGRES_URL_NON_POOLING || // Prefer non-pooling for mobile apps
   process.env.DATABASE_URL ||
   process.env.POSTGRES_URL;
 
@@ -37,11 +38,11 @@ if (cleanConnectionString) {
     global._pgPool = new Pool({
       connectionString: cleanConnectionString,
       ssl: { rejectUnauthorized: false },
-      max: 50, // Increased from 10 to 50 to handle mobile app auto-refresh
-      min: 5,  // Keep minimum 5 connections ready
-      idleTimeoutMillis: 30000,
-      connectionTimeoutMillis: 10000, // Increased timeout
-      maxUses: 7500, // Recycle connections after 7500 uses
+      max: 10, // Conservative pool size for Supabase non-pooling
+      min: 2,  // Keep minimum 2 connections ready
+      idleTimeoutMillis: 10000, // Release idle connections faster
+      connectionTimeoutMillis: 10000,
+      maxUses: 10000, // Recycle connections frequently
     });
   }
   pool = global._pgPool;
