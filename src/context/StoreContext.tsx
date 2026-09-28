@@ -12,6 +12,8 @@ import {
   AppUser,
   Publisher,
   DailyBackup,
+  StoreNotification,
+  NotificationType,
 } from "@/types";
 import {
   initialProducts,
@@ -23,6 +25,8 @@ import {
 import { getTodayDateString } from "@/utils/formatters";
 import { useModal, ModalOptions } from "@/context/ModalContext";
 import { inferItemTypeFromProduct } from "@/utils/commissionHelper";
+import { soundService } from "@/utils/soundHelper";
+import { notificationService } from "@/utils/notificationHelper";
 
 interface StoreContextType {
   isHydrated: boolean;
@@ -95,6 +99,19 @@ interface StoreContextType {
   setSelectedDate: (date: string) => void;
   resetSelectedDate: () => void;
 
+  // Notifications & Sound Alerts
+  notifications: StoreNotification[];
+  unreadNotificationsCount: number;
+  addNotification: (notification: Omit<StoreNotification, "id" | "createdAt" | "read">) => void;
+  markNotificationAsRead: (id: string) => void;
+  markAllNotificationsAsRead: () => void;
+  clearAllNotifications: () => void;
+  soundEnabled: boolean;
+  setSoundEnabled: (enabled: boolean) => void;
+  desktopNotificationsEnabled: boolean;
+  requestDesktopNotificationPermission: () => Promise<boolean>;
+  testSaleNotification: () => void;
+
   // Custom Modal Alerts and Confirmations
   showAlert: (
     message: string,
@@ -120,6 +137,7 @@ const STORAGE_KEYS = {
   CURRENT_USER: "sr_pos_current_user_v1",
   PUBLISHERS: "sr_pos_publishers_v1",
   DAILY_BACKUPS: "sr_pos_daily_backups_v1",
+  NOTIFICATIONS: "sr_pos_notifications_v1",
 };
 
 export function StoreProvider({ children }: { children: React.ReactNode }) {
@@ -137,6 +155,13 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const [publishers, setPublishers] = useState<Publisher[]>(initialPublishers);
   const [dailyBackups, setDailyBackups] = useState<DailyBackup[]>([]);
   const [selectedDate, setSelectedDate] = useState<string>(getTodayDateString());
+
+  // Notification & Sound Alerts State
+  const [notifications, setNotifications] = useState<StoreNotification[]>([]);
+  const [soundEnabled, setSoundEnabledState] = useState<boolean>(true);
+  const [desktopNotificationsEnabled, setDesktopNotificationsEnabled] = useState<boolean>(false);
+  const knownSaleIdsRef = React.useRef<Set<string>>(new Set());
+  const isInitialSyncRef = React.useRef<boolean>(true);
 
   const resetSelectedDate = () => setSelectedDate(getTodayDateString());
 
@@ -165,7 +190,44 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         setCustomers(cRes.value);
       }
       if (sRes?.status === "fulfilled" && Array.isArray(sRes.value)) {
-        setSales(sRes.value);
+        const fetchedSales: Sale[] = sRes.value;
+        setSales(fetchedSales);
+
+        // Detect newly arrived sales from other devices/cashiers
+        if (!isInitialSyncRef.current && knownSaleIdsRef.current.size > 0) {
+          const newRemoteSales = fetchedSales.filter(
+            (s) => !knownSaleIdsRef.current.has(s.id)
+          );
+          if (newRemoteSales.length > 0) {
+            const latest = newRemoteSales[0];
+            notificationService.triggerSaleAlert({
+              invoiceNo: latest.invoiceNo,
+              amount: latest.payableAmount,
+              customerName: latest.customerName,
+              itemCount: latest.items?.length || 1,
+            });
+            setNotifications((prev) => [
+              ...newRemoteSales.map((s) => ({
+                id: `notif-${Date.now()}-${s.id}`,
+                type: "sale" as NotificationType,
+                title: `নতুন বিক্রয় সম্পন্ন (#${s.invoiceNo})`,
+                message: `${s.customerName ? `${s.customerName} - ` : ""}মোট ৳${s.payableAmount.toLocaleString()}${s.dueAmount > 0 ? ` | বাকি: ৳${s.dueAmount}` : ""}`,
+                metadata: {
+                  saleId: s.id,
+                  invoiceNo: s.invoiceNo,
+                  amount: s.payableAmount,
+                  customerName: s.customerName,
+                },
+                read: false,
+                createdAt: s.createdAt || new Date().toISOString(),
+              })),
+              ...prev,
+            ].slice(0, 50));
+          }
+        }
+
+        fetchedSales.forEach((s) => knownSaleIdsRef.current.add(s.id));
+        isInitialSyncRef.current = false;
       }
       if (rRes?.status === "fulfilled" && Array.isArray(rRes.value)) {
         setReturns(rRes.value);
@@ -265,6 +327,18 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       const loadedUsers: AppUser[] = storedUsers ? JSON.parse(storedUsers) : initialUsers;
       setUsers(loadedUsers);
 
+      // Load stored notifications
+      const storedNotifs = localStorage.getItem(STORAGE_KEYS.NOTIFICATIONS);
+      if (storedNotifs) {
+        try {
+          setNotifications(JSON.parse(storedNotifs));
+        } catch {}
+      }
+      setSoundEnabledState(soundService.isEnabled());
+      if (typeof window !== "undefined" && "Notification" in window) {
+        setDesktopNotificationsEnabled(Notification.permission === "granted");
+      }
+
       if (storedCurrentUser) {
         try {
           setCurrentUser(JSON.parse(storedCurrentUser));
@@ -312,6 +386,15 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     }
   }, [syncLiveStoreData]);
 
+  // Periodic polling for multi-device sync (e.g., sales made on Android mobile app)
+  useEffect(() => {
+    if (!currentUser) return;
+    const interval = setInterval(() => {
+      syncLiveStoreData(currentUser.role);
+    }, 20000);
+    return () => clearInterval(interval);
+  }, [currentUser, syncLiveStoreData]);
+
   // Save to LocalStorage whenever state changes
   useEffect(() => {
     if (!isHydrated) return;
@@ -326,6 +409,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(users));
       localStorage.setItem(STORAGE_KEYS.PUBLISHERS, JSON.stringify(publishers));
       localStorage.setItem(STORAGE_KEYS.DAILY_BACKUPS, JSON.stringify(dailyBackups));
+      localStorage.setItem(STORAGE_KEYS.NOTIFICATIONS, JSON.stringify(notifications.slice(0, 50)));
       if (currentUser) {
         localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(currentUser));
       } else {
@@ -334,7 +418,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     } catch (e) {
       console.error("Failed to persist data to localStorage:", e);
     }
-  }, [products, customers, sales, returns, duePayments, expenses, settings, users, currentUser, publishers, dailyBackups, isHydrated]);
+  }, [products, customers, sales, returns, duePayments, expenses, settings, users, currentUser, publishers, dailyBackups, notifications, isHydrated]);
 
   // Auth Methods
   const login = async (
@@ -709,6 +793,61 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     return payment;
   };
 
+  // Notification Actions
+  const unreadNotificationsCount = notifications.filter((n) => !n.read).length;
+
+  const setSoundEnabled = (enabled: boolean) => {
+    soundService.setEnabled(enabled);
+    setSoundEnabledState(enabled);
+  };
+
+  const requestDesktopNotificationPermission = async (): Promise<boolean> => {
+    const granted = await notificationService.requestPermission();
+    setDesktopNotificationsEnabled(granted);
+    return granted;
+  };
+
+  const addNotification = (
+    notifData: Omit<StoreNotification, "id" | "createdAt" | "read">
+  ) => {
+    const newNotif: StoreNotification = {
+      ...notifData,
+      id: `notif-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+      read: false,
+      createdAt: new Date().toISOString(),
+    };
+    setNotifications((prev) => [newNotif, ...prev].slice(0, 50));
+  };
+
+  const markNotificationAsRead = (id: string) => {
+    setNotifications((prev) =>
+      prev.map((n) => (n.id === id ? { ...n, read: true } : n))
+    );
+  };
+
+  const markAllNotificationsAsRead = () => {
+    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+  };
+
+  const clearAllNotifications = () => {
+    setNotifications([]);
+  };
+
+  const testSaleNotification = () => {
+    notificationService.triggerSaleAlert({
+      invoiceNo: "TEST-9922",
+      amount: 1540,
+      customerName: "পরীক্ষামূলক ক্রেতা",
+      itemCount: 3,
+    });
+    addNotification({
+      type: "sale",
+      title: "টেস্ট বিক্রয় নোটিফিকেশন",
+      message: "ইনভয়েস #TEST-9922 - মোট: ৳1,540 (পরীক্ষামূলক ক্রেতা)",
+      metadata: { invoiceNo: "TEST-9922", amount: 1540, customerName: "পরীক্ষামূলক ক্রেতা" },
+    });
+  };
+
   // Sale Actions
   const createSale = (saleData: Omit<Sale, "id" | "invoiceNo" | "createdAt">): Sale => {
     const prefix = settings.invoicePrefix?.trim() || "INV";
@@ -725,15 +864,57 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     };
 
     setSales((prev) => [newSale, ...prev]);
+    knownSaleIdsRef.current.add(newSale.id);
 
-    // Deduct stock for each sold item in state
+    // 1. Audio chime & Desktop push alert
+    notificationService.triggerSaleAlert({
+      invoiceNo: newSale.invoiceNo,
+      amount: newSale.payableAmount,
+      customerName: newSale.customerName,
+      itemCount: newSale.items.length,
+    });
+
+    // 2. Add to in-app notification center
+    const notifMessage = `${newSale.customerName ? `${newSale.customerName} - ` : ""}মোট ৳${newSale.payableAmount.toLocaleString()} (${newSale.items.length} টি পণ্য)${
+      newSale.dueAmount > 0 ? ` | বাকি: ৳${newSale.dueAmount.toLocaleString()}` : " | নগদ পরিশোধ"
+    }`;
+    addNotification({
+      type: "sale",
+      title: `নতুন বিক্রয় সম্পন্ন (#${newSale.invoiceNo})`,
+      message: notifMessage,
+      metadata: {
+        saleId: newSale.id,
+        invoiceNo: newSale.invoiceNo,
+        amount: newSale.payableAmount,
+        customerName: newSale.customerName,
+      },
+    });
+
+    // 3. Deduct stock for each sold item in state & check low-stock thresholds
     setProducts((prev) =>
       prev.map((prod) => {
         const soldItem = newSale.items.find((item) => item.productId === prod.id);
         if (soldItem) {
+          const remaining = Math.max(0, prod.stockQty - soldItem.quantity);
+          if (remaining <= prod.minStockAlert) {
+            notificationService.triggerLowStockAlert({
+              productName: prod.name,
+              stockQty: remaining,
+            });
+            addNotification({
+              type: "low_stock",
+              title: `কম স্টক সতর্কতা: ${prod.name}`,
+              message: `"${prod.name}" বইয়ের স্টক কমে মাত্র ${remaining} টি অবশিষ্ট রয়েছে!`,
+              metadata: {
+                productId: prod.id,
+                productName: prod.name,
+                stockQty: remaining,
+              },
+            });
+          }
           return {
             ...prod,
-            stockQty: Math.max(0, prod.stockQty - soldItem.quantity),
+            stockQty: remaining,
             updatedAt: new Date().toISOString(),
           };
         }
@@ -975,6 +1156,17 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         selectedDate,
         setSelectedDate,
         resetSelectedDate,
+        notifications,
+        unreadNotificationsCount,
+        addNotification,
+        markNotificationAsRead,
+        markAllNotificationsAsRead,
+        clearAllNotifications,
+        soundEnabled,
+        setSoundEnabled,
+        desktopNotificationsEnabled,
+        requestDesktopNotificationPermission,
+        testSaleNotification,
         showAlert,
         showConfirm,
       }}

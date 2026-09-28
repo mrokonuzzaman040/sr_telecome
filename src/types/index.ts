@@ -263,3 +263,24 @@ export interface ShopSettings {
   expensePrefix: string; // e.g. "EXP" for expense voucher numbers
   skuPrefix: string; // e.g. "BK" for auto-generated product SKUs
 }
+
+export type NotificationType = 'sale' | 'low_stock' | 'due' | 'system';
+
+export interface StoreNotification {
+  id: string;
+  type: NotificationType;
+  title: string;
+  message: string;
+  metadata?: {
+    saleId?: string;
+    invoiceNo?: string;
+    amount?: number;
+    customerName?: string;
+    productId?: string;
+    productName?: string;
+    stockQty?: number;
+    [key: string]: any;
+  };
+  read: boolean;
+  createdAt: string;
+}
