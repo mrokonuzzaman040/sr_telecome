@@ -640,11 +640,16 @@ export function SettingsView() {
         {/* Android Push Notification Info Banner */}
         <div className="p-3 rounded-lg border border-blue-200 bg-blue-50/50 flex items-start gap-2.5 text-xs text-blue-900">
           <Smartphone className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
-          <div className="space-y-0.5 leading-relaxed">
-            <span className="font-bold text-blue-950">অ্যান্ড্রয়েড মোবাইল পুশ নোটিফিকেশন (FCM):</span>
+          <div className="space-y-1 leading-relaxed flex-1">
+            <div className="flex flex-wrap items-center justify-between gap-1">
+              <span className="font-bold text-blue-950">অ্যান্ড্রয়েড ও মোবাইল পুশ নোটিফিকেশন (Firebase FCM):</span>
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-bold">
+                ✓ Firebase Connected (boighor-pos)
+              </span>
+            </div>
             <p className="text-[11px] text-blue-800">
-              অ্যান্ড্রয়েড মোবাইল অ্যাপ চালু থাকলে বা ব্যাকগ্রাউন্ডে থাকলেও যেকোনো বিক্রয় সম্পন্ন হওয়ার সাথে সাথে পুশ নোটিফিকেশন পাঠাতে সার্ভার প্রস্তুত। 
-              মোবাইল অ্যাপ লগইন করলেই স্বয়ংক্রিয়ভাবে ব্যাকএন্ডের <code className="bg-blue-100 px-1 rounded font-mono text-[10px]">/api/notifications/register-token</code> এন্ডপয়েন্টে ডিভাইস টোকেন যুক্ত হয়ে যায়।
+              Firebase Project: <code className="bg-blue-100 px-1.5 py-0.5 rounded font-mono text-[10px] font-bold text-blue-950">boighor-pos</code> | Android App: <code className="bg-blue-100 px-1.5 py-0.5 rounded font-mono text-[10px] font-bold text-blue-950">com.boighor.boighor_pos</code>। 
+              মোবাইল ও ওয়েবে যেকোনো বিক্রয় সম্পন্ন হওয়ার সাথে সাথে ব্যাকএন্ড স্বয়ংক্রিয়ভাবে অ্যান্ড্রয়েড ডিভাইসে পুশ নোটিফিকেশন পাঠাবে।
             </p>
           </div>
         </div>
