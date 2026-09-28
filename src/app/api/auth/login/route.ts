@@ -27,8 +27,8 @@ export async function POST(req: NextRequest) {
 
     // Rate limiting: 5 attempts / 5 min per IP, and separately per-username so
     // an attacker can't evade the IP limit by rotating IPs against one account.
-    const ipRateCheck = checkRateLimit(`login:ip:${ip}`, 5, 300);
-    const userRateCheck = checkRateLimit(`login:user:${cleanUser}`, 5, 300);
+    const ipRateCheck = await checkRateLimit(`login:ip:${ip}`, 5, 300);
+    const userRateCheck = await checkRateLimit(`login:user:${cleanUser}`, 5, 300);
     const rateCheck = ipRateCheck.allowed ? userRateCheck : ipRateCheck;
     if (!rateCheck.allowed) {
       return NextResponse.json(

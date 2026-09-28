@@ -8,7 +8,7 @@ import { checkRateLimit, getClientIp } from "@/lib/rateLimit";
 export async function GET(req: NextRequest) {
   try {
     const ip = getClientIp(req);
-    const rateCheck = checkRateLimit(`verify:${ip}`, 60, 60);
+    const rateCheck = await checkRateLimit(`verify:${ip}`, 60, 60);
     if (!rateCheck.allowed) {
       return NextResponse.json(
         { error: "Too many verification requests. Please try again shortly." },
