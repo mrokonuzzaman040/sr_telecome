@@ -3,6 +3,7 @@ import '../models/product.dart';
 import '../models/customer.dart';
 import '../models/sale.dart';
 import '../models/expense.dart';
+import '../models/publisher.dart';
 import '../services/api_service.dart';
 
 class StoreProvider extends ChangeNotifier {
@@ -10,6 +11,7 @@ class StoreProvider extends ChangeNotifier {
   List<Customer> _customers = [];
   List<Sale> _sales = [];
   List<Expense> _expenses = [];
+  List<Publisher> _publishers = [];
 
   bool _isLoading = false;
   String? _errorMessage;
@@ -27,6 +29,7 @@ class StoreProvider extends ChangeNotifier {
   List<Customer> get customers => _customers;
   List<Sale> get sales => _sales;
   List<Expense> get expenses => _expenses;
+  List<Publisher> get publishers => _publishers;
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
 
@@ -57,12 +60,14 @@ class StoreProvider extends ChangeNotifier {
         ApiService.fetchCustomers().catchError((_) => <Customer>[]),
         ApiService.fetchSales().catchError((_) => <Sale>[]),
         ApiService.fetchExpenses().catchError((_) => <Expense>[]),
+        ApiService.fetchPublishers().catchError((_) => <Publisher>[]),
       ]);
 
       _products = results[0] as List<Product>;
       _customers = results[1] as List<Customer>;
       _sales = results[2] as List<Sale>;
       _expenses = results[3] as List<Expense>;
+      _publishers = results[4] as List<Publisher>;
     } catch (e) {
       _errorMessage = e.toString();
     } finally {
@@ -292,6 +297,50 @@ class StoreProvider extends ChangeNotifier {
   Future<void> addExpense(Expense expense) async {
     final created = await ApiService.createExpense(expense);
     _expenses.insert(0, created);
+    notifyListeners();
+  }
+
+  // --- PRODUCT CRUD ---
+  Future<void> addProduct(Product product) async {
+    final created = await ApiService.createProduct(product);
+    _products.insert(0, created);
+    notifyListeners();
+  }
+
+  Future<void> updateProduct(Product product) async {
+    final updated = await ApiService.updateProduct(product);
+    final index = _products.indexWhere((p) => p.id == updated.id);
+    if (index != -1) {
+      _products[index] = updated;
+    }
+    notifyListeners();
+  }
+
+  // --- CUSTOMER CRUD ---
+  Future<void> addCustomer(Customer customer) async {
+    final created = await ApiService.createCustomer(customer);
+    _customers.insert(0, created);
+    notifyListeners();
+  }
+
+  Future<void> updateCustomer(Customer customer) async {
+    final updated = await ApiService.updateCustomer(customer);
+    final index = _customers.indexWhere((c) => c.id == updated.id);
+    if (index != -1) {
+      _customers[index] = updated;
+    }
+    notifyListeners();
+  }
+
+  // --- PUBLISHER CRUD (server upserts by name) ---
+  Future<void> savePublisher(Publisher publisher) async {
+    final saved = await ApiService.savePublisher(publisher);
+    final index = _publishers.indexWhere((p) => p.id == saved.id || p.name == saved.name);
+    if (index != -1) {
+      _publishers[index] = saved;
+    } else {
+      _publishers.insert(0, saved);
+    }
     notifyListeners();
   }
 

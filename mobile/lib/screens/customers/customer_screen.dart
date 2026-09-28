@@ -5,6 +5,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../providers/store_provider.dart';
 import '../../models/customer.dart';
 import '../../theme/app_theme.dart';
+import 'customer_form_screen.dart';
 
 class CustomerScreen extends StatefulWidget {
   const CustomerScreen({super.key});
@@ -142,6 +143,14 @@ class _CustomerScreenState extends State<CustomerScreen> {
             onPressed: () => store.loadAllData(),
           ),
         ],
+      ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const CustomerFormScreen()),
+        ),
+        icon: const Icon(Icons.add),
+        label: const Text('নতুন কাস্টমার'),
       ),
       body: Column(
         children: [
@@ -304,6 +313,14 @@ class _CustomerScreenState extends State<CustomerScreen> {
                                           IconButton.outlined(
                                             icon: const Icon(Icons.chat, size: 18, color: Colors.green),
                                             onPressed: () => _openWhatsApp(customer.phone, customer.currentDue),
+                                          ),
+                                          const SizedBox(width: 8),
+                                          IconButton.outlined(
+                                            icon: const Icon(Icons.edit_outlined, size: 18, color: AppTheme.secondary),
+                                            onPressed: () => Navigator.push(
+                                              context,
+                                              MaterialPageRoute(builder: (_) => CustomerFormScreen(customer: customer)),
+                                            ),
                                           ),
                                         ],
                                       ),

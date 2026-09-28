@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
-import '../services/api_service.dart';
 import '../theme/app_theme.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -13,21 +12,25 @@ class LoginScreen extends StatefulWidget {
 
 class _LoginScreenState extends State<LoginScreen> {
   String _pin = '';
+  String _username = 'admin'; // matches seeded web-app usernames: admin / cashier
   String? _errorMessage;
+  bool _isSubmitting = false;
 
   void _onKeyPress(String digit) {
+    if (_isSubmitting) return;
     if (_pin.length < 6) {
       setState(() {
         _pin += digit;
         _errorMessage = null;
       });
       if (_pin.length == 4) {
-        _submitPin(_pin);
+        _submitLogin();
       }
     }
   }
 
   void _onBackspace() {
+    if (_isSubmitting) return;
     if (_pin.isNotEmpty) {
       setState(() {
         _pin = _pin.substring(0, _pin.length - 1);
@@ -36,64 +39,24 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
-  void _submitPin(String pin) async {
+  Future<void> _submitLogin() async {
+    setState(() {
+      _isSubmitting = true;
+      _errorMessage = null;
+    });
+
     final auth = Provider.of<AuthProvider>(context, listen: false);
-    final success = await auth.loginWithPin(pin);
-    if (!success) {
+    try {
+      await auth.login(_username, _pin);
+    } catch (e) {
+      if (!mounted) return;
       setState(() {
-        _errorMessage = 'ভুল পিন কোড! সঠিক ৪ ডিজিট পিন দিন।';
+        _errorMessage = e.toString().replaceFirst('Exception: ', '');
         _pin = '';
       });
+    } finally {
+      if (mounted) setState(() => _isSubmitting = false);
     }
-  }
-
-  void _showServerSettings() async {
-    final currentUrl = await ApiService.getBaseUrl();
-    final controller = TextEditingController(text: currentUrl);
-
-    if (!mounted) return;
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('সার্ভার সংযোগ সেটিংস'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'আপনার Next.js সার্ভারের URL দিন:\n(যেমন: http://192.168.0.105:3000 অথবা আপনার Vercel ডোমেইন)',
-              style: TextStyle(fontSize: 13, color: Colors.grey),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: controller,
-              decoration: const InputDecoration(
-                labelText: 'API Base URL',
-                prefixIcon: Icon(Icons.link),
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('বাতিল'),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              await ApiService.setBaseUrl(controller.text);
-              if (ctx.mounted) Navigator.pop(ctx);
-              if (mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('সার্ভার URL সফলভাবে সংরক্ষিত হয়েছে')),
-                );
-              }
-            },
-            child: const Text('সংরক্ষণ করুন'),
-          ),
-        ],
-      ),
-    );
   }
 
   @override
@@ -139,7 +102,25 @@ class _LoginScreenState extends State<LoginScreen> {
                     letterSpacing: 0.5,
                   ),
                 ),
-                const SizedBox(height: 32),
+                const SizedBox(height: 24),
+
+                // Role selector — picks which username the PIN is checked against
+                Container(
+                  padding: const EdgeInsets.all(4),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.06),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      _buildRoleChip('মালিক', 'admin'),
+                      _buildRoleChip('বিক্রয়কর্মী', 'cashier'),
+                    ],
+                  ),
+                ),
+
+                const SizedBox(height: 24),
 
                 // PIN indicator dots
                 Row(
@@ -162,10 +143,20 @@ class _LoginScreenState extends State<LoginScreen> {
                   }),
                 ),
 
+                if (_isSubmitting) ...[
+                  const SizedBox(height: 16),
+                  const SizedBox(
+                    width: 22,
+                    height: 22,
+                    child: CircularProgressIndicator(strokeWidth: 2.5, color: AppTheme.success),
+                  ),
+                ],
+
                 if (_errorMessage != null) ...[
                   const SizedBox(height: 16),
                   Text(
                     _errorMessage!,
+                    textAlign: TextAlign.center,
                     style: const TextStyle(color: AppTheme.danger, fontSize: 13),
                   ),
                 ],
@@ -186,10 +177,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                         children: [
-                          IconButton(
-                            onPressed: _showServerSettings,
-                            icon: const Icon(Icons.settings, color: Colors.white54, size: 28),
-                          ),
+                          const SizedBox(width: 48, height: 48),
                           _buildKeyButton('0'),
                           IconButton(
                             onPressed: _onBackspace,
@@ -200,28 +188,35 @@ class _LoginScreenState extends State<LoginScreen> {
                     ],
                   ),
                 ),
-
-                const SizedBox(height: 32),
-
-                // Quick Login Helper Chips
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    ActionChip(
-                      backgroundColor: Colors.white10,
-                      label: const Text('মালিক (PIN: 1234)', style: TextStyle(color: Colors.white70, fontSize: 12)),
-                      onPressed: () => _submitPin('1234'),
-                    ),
-                    const SizedBox(width: 12),
-                    ActionChip(
-                      backgroundColor: Colors.white10,
-                      label: const Text('ক্যাশিয়ার (PIN: 5678)', style: TextStyle(color: Colors.white70, fontSize: 12)),
-                      onPressed: () => _submitPin('5678'),
-                    ),
-                  ],
-                ),
               ],
             ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildRoleChip(String label, String username) {
+    final selected = _username == username;
+    return GestureDetector(
+      onTap: _isSubmitting
+          ? null
+          : () => setState(() {
+                _username = username;
+                _errorMessage = null;
+              }),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+        decoration: BoxDecoration(
+          color: selected ? AppTheme.success : Colors.transparent,
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: selected ? Colors.white : Colors.white60,
+            fontWeight: selected ? FontWeight.bold : FontWeight.normal,
+            fontSize: 13,
           ),
         ),
       ),

@@ -1,10 +1,11 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/user.dart';
+import '../services/api_service.dart';
 
 class AuthProvider extends ChangeNotifier {
-  static const String _userKey = 'sr_auth_user';
-  static const String _roleKey = 'sr_auth_role';
+  static const String _userJsonKey = 'sr_auth_user_json';
 
   AppUser? _currentUser;
   bool _isLoading = true;
@@ -20,60 +21,41 @@ class AuthProvider extends ChangeNotifier {
 
   Future<void> _loadUserSession() async {
     final prefs = await SharedPreferences.getInstance();
-    final username = prefs.getString(_userKey);
-    final role = prefs.getString(_roleKey);
+    final userJson = prefs.getString(_userJsonKey);
 
-    if (username != null && role != null) {
-      _currentUser = AppUser(
-        id: role == 'admin' ? 'user-admin' : 'user-staff',
-        name: role == 'admin' ? 'মালিক (Proprietor)' : 'বিক্রয়কর্মী (Cashier)',
-        username: username,
-        role: role,
-        pin: role == 'admin' ? '1234' : '5678',
-      );
+    if (userJson != null) {
+      try {
+        _currentUser = AppUser.fromJson(jsonDecode(userJson) as Map<String, dynamic>);
+      } catch (_) {
+        _currentUser = null;
+      }
     }
     _isLoading = false;
     notifyListeners();
   }
 
-  Future<bool> loginWithPin(String pin) async {
-    // Default credentials as defined in the system
-    if (pin == '1234') {
-      _currentUser = AppUser(
-        id: 'user-admin',
-        name: 'মালিক (Proprietor)',
-        username: 'admin',
-        role: 'admin',
-        pin: '1234',
-      );
-    } else if (pin == '5678') {
-      _currentUser = AppUser(
-        id: 'user-staff',
-        name: 'বিক্রয়কর্মী (Cashier)',
-        username: 'cashier',
-        role: 'staff',
-        pin: '5678',
-      );
-    } else {
-      return false;
-    }
+  /// Authenticates against the real backend (`/api/auth/login`).
+  /// Throws an [Exception] with a user-facing message on failure.
+  Future<void> login(String username, String pin) async {
+    final user = await ApiService.login(username, pin);
+    _currentUser = user;
 
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_userKey, _currentUser!.username);
-    await prefs.setString(_roleKey, _currentUser!.role);
+    await prefs.setString(_userJsonKey, jsonEncode(user.toJson()));
     notifyListeners();
-    return true;
   }
 
-  bool verifyAdminPin(String pin) {
-    return pin == '1234';
+  /// Re-verifies the admin PIN against the backend without changing the
+  /// active session. Used to unlock admin-only sections (e.g. Reports).
+  Future<bool> verifyAdminPin(String pin) async {
+    return ApiService.verifyPinOnly('admin', pin);
   }
 
   Future<void> logout() async {
     _currentUser = null;
     final prefs = await SharedPreferences.getInstance();
-    await prefs.remove(_userKey);
-    await prefs.remove(_roleKey);
+    await prefs.remove(_userJsonKey);
+    await ApiService.clearToken();
     notifyListeners();
   }
 }

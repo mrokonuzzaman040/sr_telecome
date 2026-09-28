@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
-import '../../providers/store_provider.dart';
-import '../../services/api_service.dart';
 import '../../theme/app_theme.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -13,40 +11,6 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
-  final TextEditingController _urlController = TextEditingController();
-  bool _isSaving = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadUrl();
-  }
-
-  void _loadUrl() async {
-    final url = await ApiService.getBaseUrl();
-    setState(() => _urlController.text = url);
-  }
-
-  @override
-  void dispose() {
-    _urlController.dispose();
-    super.dispose();
-  }
-
-  void _saveServerUrl() async {
-    setState(() => _isSaving = true);
-    await ApiService.setBaseUrl(_urlController.text);
-    if (!mounted) return;
-    final store = Provider.of<StoreProvider>(context, listen: false);
-    await store.loadAllData();
-    setState(() => _isSaving = false);
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('সার্ভার URL সংরক্ষিত ও ডেটা রিফ্রেশ সম্পন্ন!'), backgroundColor: AppTheme.success),
-      );
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final auth = Provider.of<AuthProvider>(context);
@@ -77,50 +41,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 icon: const Icon(Icons.logout, color: AppTheme.danger),
                 tooltip: 'লগআউট',
                 onPressed: () => auth.logout(),
-              ),
-            ),
-          ),
-          const SizedBox(height: 16),
-
-          // Server Connection Section
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Row(
-                    children: [
-                      Icon(Icons.dns_outlined, color: AppTheme.primary),
-                      SizedBox(width: 8),
-                      Text('সার্ভার কানেকশন (API Base URL)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  const Text(
-                    'মোবাইল অ্যাপকে Next.js ব্যাকএন্ডের সাথে যুক্ত করতে সার্ভার অ্যাড্রেস দিন:',
-                    style: TextStyle(fontSize: 12, color: Colors.grey),
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: _urlController,
-                    decoration: const InputDecoration(
-                      hintText: 'http://192.168.0.105:3000',
-                      prefixIcon: Icon(Icons.link),
-                      isDense: true,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: _isSaving ? null : _saveServerUrl,
-                      child: _isSaving
-                          ? const CircularProgressIndicator(color: Colors.white)
-                          : const Text('সংরক্ষণ ও সংযোগ পরীক্ষা করুন'),
-                    ),
-                  ),
-                ],
               ),
             ),
           ),

@@ -4,6 +4,8 @@ import 'package:intl/intl.dart';
 import '../../providers/store_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../theme/app_theme.dart';
+import 'product_form_screen.dart';
+import '../publishers/publishers_screen.dart';
 
 class InventoryScreen extends StatefulWidget {
   const InventoryScreen({super.key});
@@ -47,10 +49,26 @@ class _InventoryScreenState extends State<InventoryScreen> {
         title: const Text('স্টক ও ইনভেন্টরি'),
         actions: [
           IconButton(
+            icon: const Icon(Icons.business_outlined),
+            tooltip: 'প্রকাশনী তালিকা',
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const PublishersScreen()),
+            ),
+          ),
+          IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: () => store.loadAllData(),
           ),
         ],
+      ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const ProductFormScreen()),
+        ),
+        icon: const Icon(Icons.add),
+        label: const Text('নতুন পণ্য'),
       ),
       body: Column(
         children: [
@@ -154,7 +172,13 @@ class _InventoryScreenState extends State<InventoryScreen> {
                           final product = filtered[index];
                           return Card(
                             margin: const EdgeInsets.only(bottom: 8),
-                            child: Padding(
+                            child: InkWell(
+                              borderRadius: BorderRadius.circular(14),
+                              onTap: () => Navigator.push(
+                                context,
+                                MaterialPageRoute(builder: (_) => ProductFormScreen(product: product)),
+                              ),
+                              child: Padding(
                               padding: const EdgeInsets.all(12),
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -212,6 +236,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                                     ],
                                   ),
                                 ],
+                              ),
                               ),
                             ),
                           );
