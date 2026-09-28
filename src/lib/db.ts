@@ -22,9 +22,18 @@ const connectionString =
   process.env.POSTGRES_URL ||
   process.env.POSTGRES_URL_NON_POOLING;
 
-let cleanConnectionString = connectionString
-  ? connectionString.replace(/[?&]sslmode=[^&]+/, "")
-  : undefined;
+// Clean the connection string by removing problematic query parameters
+let cleanConnectionString = connectionString;
+if (cleanConnectionString) {
+  // Remove sslmode parameter (we set it explicitly in pool config)
+  cleanConnectionString = cleanConnectionString.replace(/[?&]sslmode=[^&]+/, "");
+  // Remove supa parameter (Supabase-specific, can cause parsing issues)
+  cleanConnectionString = cleanConnectionString.replace(/[?&]supa=[^&]+/, "");
+  // Remove pgbouncer parameter (can cause parsing issues)
+  cleanConnectionString = cleanConnectionString.replace(/[?&]pgbouncer=[^&]+/, "");
+  // Clean up trailing ? or &
+  cleanConnectionString = cleanConnectionString.replace(/[?&]$/, "");
+}
 
 // Global Pool instance to prevent connection exhaustion in serverless Next.js
 declare global {

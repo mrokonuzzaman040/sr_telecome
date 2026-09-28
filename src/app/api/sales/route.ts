@@ -75,6 +75,8 @@ export async function POST(req: NextRequest) {
     const invoiceNo = body.invoiceNo;
     const now = new Date().toISOString();
 
+    console.log(`🛒 Creating sale: ${invoiceNo}, Total: ${body.payableAmount}`);
+
     await client.query("BEGIN");
 
     // 1. Insert into sales
@@ -108,26 +110,31 @@ export async function POST(req: NextRequest) {
       ]
     );
 
+    console.log(`✅ Sale inserted into database: ${insertRes.rows[0].invoice_no}`);
+
     // 2. Decrement stock for each item in products
     if (Array.isArray(body.items)) {
       for (const item of body.items as SaleItem[]) {
-        await client.query(
+        const stockResult = await client.query(
           `UPDATE products 
            SET stock_qty = GREATEST(0, stock_qty - $1), updated_at = NOW() 
-           WHERE id = $2`,
+           WHERE id = $2
+           RETURNING stock_qty`,
           [item.quantity, item.productId]
         );
+        console.log(`📦 Updated stock for ${item.productId}: new qty = ${stockResult.rows[0].stock_qty}`);
       }
     }
 
     // 3. Update customer ledger if linked
     if (body.customerId) {
-      await client.query(
+      const customerResult = await client.query(
         `UPDATE customers 
          SET total_purchased = total_purchased + $1,
              total_paid = total_paid + $2,
              current_due = current_due + $3
-         WHERE id = $4`,
+         WHERE id = $4
+         RETURNING total_due`,
         [
           Number(body.payableAmount) || 0,
           Number(body.paidAmount) || 0,
@@ -135,6 +142,7 @@ export async function POST(req: NextRequest) {
           body.customerId,
         ]
       );
+      console.log(`👤 Updated customer ${body.customerId}: new due = ${customerResult.rows[0].total_due}`);
     }
 
     // 4. Log to persistent notifications table
@@ -165,6 +173,8 @@ export async function POST(req: NextRequest) {
 
     await client.query("COMMIT");
 
+    console.log(`✅ Transaction committed successfully for sale: ${invoiceNo}`);
+
     // 5. Asynchronously broadcast push notification to all registered Android mobile devices
     sendSalePushNotification({
       invoiceNo,
@@ -180,7 +190,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ success: true, sale: insertRes.rows[0] });
   } catch (err: any) {
     await client.query("ROLLBACK");
-    console.error("Sales POST Error:", err);
+    console.error("❌ Sales POST Error (Transaction rolled back):", err);
+    console.error("❌ Error details:", {
+      message: err?.message,
+      code: err?.code,
+      detail: err?.detail,
+      stack: err?.stack,
+    });
     return NextResponse.json({ error: err?.message }, { status: 500 });
   } finally {
     client.release();
