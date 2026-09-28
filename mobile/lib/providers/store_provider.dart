@@ -205,7 +205,6 @@ class StoreProvider extends ChangeNotifier {
       _errorMessage = null;
       await _saveOfflineCache();
     } catch (e) {
-      debugPrint('❌ Combined sync failed: $e');
       if (e is AuthRequiredException) {
         _isSessionExpired = true;
         _errorMessage = 'লগইন সেশনের মেয়াদ শেষ। পুনরায় লগইন করুন।';
