@@ -4,6 +4,9 @@ import 'package:intl/intl.dart';
 import '../../providers/store_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../theme/app_theme.dart';
+import '../../widgets/stat_card.dart';
+import '../../widgets/empty_state.dart';
+import '../../widgets/status_badge.dart';
 import 'product_form_screen.dart';
 import '../publishers/publishers_screen.dart';
 
@@ -104,66 +107,31 @@ class _InventoryScreenState extends State<InventoryScreen> {
         icon: const Icon(Icons.add),
         label: const Text('নতুন পণ্য'),
       ),
+      backgroundColor: AppTheme.backgroundLight,
       body: Column(
         children: [
           // Stock Metric Overview Cards
-          Container(
-            padding: const EdgeInsets.all(12),
-            color: Colors.white,
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
             child: Row(
               children: [
                 Expanded(
-                  child: Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: Colors.teal.shade50,
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: Colors.teal.shade200),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text('মোট পণ্য', style: TextStyle(fontSize: 12, color: AppTheme.primary)),
-                        Text(
-                          '${store.products.length} টি',
-                          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppTheme.primary),
-                        ),
-                      ],
-                    ),
+                  child: StatCard(
+                    label: 'মোট পণ্য',
+                    value: '${products.length} টি',
+                    icon: Icons.inventory_2_outlined,
+                    color: AppTheme.primary,
                   ),
                 ),
                 const SizedBox(width: 10),
                 Expanded(
-                  child: InkWell(
-                    onTap: () {
-                      setState(() => _showOnlyLowStock = !_showOnlyLowStock);
-                    },
-                    borderRadius: BorderRadius.circular(10),
-                    child: Container(
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        color: _showOnlyLowStock ? Colors.red.shade100 : Colors.red.shade50,
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: Colors.red.shade300, width: _showOnlyLowStock ? 2 : 1),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              const Text('কম স্টক এলার্ট', style: TextStyle(fontSize: 12, color: AppTheme.danger)),
-                              if (_showOnlyLowStock)
-                                const Icon(Icons.check_circle, size: 14, color: AppTheme.danger),
-                            ],
-                          ),
-                          Text(
-                            '$lowStockCount টি',
-                            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppTheme.danger),
-                          ),
-                        ],
-                      ),
-                    ),
+                  child: StatCard(
+                    label: 'কম স্টক এলার্ট',
+                    value: '$lowStockCount টি',
+                    icon: Icons.warning_amber_rounded,
+                    color: AppTheme.danger,
+                    selected: _showOnlyLowStock,
+                    onTap: () => setState(() => _showOnlyLowStock = !_showOnlyLowStock),
                   ),
                 ),
               ],
@@ -235,17 +203,11 @@ class _InventoryScreenState extends State<InventoryScreen> {
             child: isLoading
                 ? const Center(child: CircularProgressIndicator())
                 : filtered.isEmpty
-                    ? Center(
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Icon(Icons.search_off, size: 48, color: Colors.grey),
-                            const SizedBox(height: 8),
-                            const Text('কোন পণ্য মেলেনি', style: TextStyle(color: Colors.grey)),
-                            if (_hasActiveFilters)
-                              TextButton(onPressed: _clearFilters, child: const Text('ফিল্টার মুছুন')),
-                          ],
-                        ),
+                    ? EmptyState(
+                        icon: Icons.search_off,
+                        message: 'কোন পণ্য মেলেনি',
+                        actionLabel: _hasActiveFilters ? 'ফিল্টার মুছুন' : null,
+                        onAction: _hasActiveFilters ? _clearFilters : null,
                       )
                     : RefreshIndicator(
                       onRefresh: store.loadAllData,
@@ -255,72 +217,84 @@ class _InventoryScreenState extends State<InventoryScreen> {
                         itemBuilder: (ctx, index) {
                           final product = filtered[index];
                           return Card(
-                            margin: const EdgeInsets.only(bottom: 8),
+                            margin: const EdgeInsets.only(bottom: 10),
+                            clipBehavior: Clip.antiAlias,
                             child: InkWell(
-                              borderRadius: BorderRadius.circular(14),
                               onTap: () => Navigator.push(
                                 context,
                                 MaterialPageRoute(builder: (_) => ProductFormScreen(product: product)),
                               ),
                               child: Padding(
-                              padding: const EdgeInsets.all(12),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Row(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Expanded(
-                                        child: Text(
-                                          product.displayName,
-                                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
-                                        ),
+                                padding: const EdgeInsets.all(14),
+                                child: Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Container(
+                                      padding: const EdgeInsets.all(10),
+                                      decoration: BoxDecoration(
+                                        color: (product.category == 'book' ? AppTheme.secondary : Colors.orange)
+                                            .withValues(alpha: 0.1),
+                                        borderRadius: BorderRadius.circular(12),
                                       ),
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                                        decoration: BoxDecoration(
-                                          color: product.isLowStock ? Colors.red.shade100 : Colors.green.shade100,
-                                          borderRadius: BorderRadius.circular(6),
-                                        ),
-                                        child: Text(
-                                          'স্টক: ${product.stockQty} ${product.unit}',
-                                          style: TextStyle(
-                                            fontSize: 12,
-                                            fontWeight: FontWeight.bold,
-                                            color: product.isLowStock ? AppTheme.danger : AppTheme.success,
+                                      child: Icon(
+                                        product.category == 'book' ? Icons.menu_book_rounded : Icons.inventory_2_rounded,
+                                        color: product.category == 'book' ? AppTheme.secondary : Colors.orange.shade800,
+                                        size: 20,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Row(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              Expanded(
+                                                child: Text(
+                                                  product.displayName,
+                                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14.5),
+                                                ),
+                                              ),
+                                              StatusBadge(
+                                                label: '${product.stockQty} ${product.unit}',
+                                                color: product.isLowStock ? AppTheme.danger : AppTheme.success,
+                                              ),
+                                            ],
                                           ),
-                                        ),
+                                          const SizedBox(height: 6),
+                                          Wrap(
+                                            spacing: 6,
+                                            runSpacing: 6,
+                                            children: [
+                                              if (product.bookClass != null)
+                                                StatusBadge(label: product.bookClass!, color: AppTheme.secondary, bold: false),
+                                              if (product.publisher != null)
+                                                StatusBadge(label: product.publisher!, color: Colors.teal, bold: false),
+                                            ],
+                                          ),
+                                          const SizedBox(height: 8),
+                                          Text('\u09ac\u09be\u09b0\u0995\u09cb\u09a1: ${product.barcode}', style: const TextStyle(fontSize: 11, color: AppTheme.textFaint)),
+                                          const Divider(height: 18),
+                                          Row(
+                                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                            children: [
+                                              Text(
+                                                '\u09f3${currencyFormat.format(product.mrp)}',
+                                                style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16, color: AppTheme.primary),
+                                              ),
+                                              if (isAdmin)
+                                                Text(
+                                                  '\u0995\u09cd\u09b0\u09df\u09ae\u09c2\u09b2\u09cd\u09af: \u09f3${currencyFormat.format(product.buyPrice)}',
+                                                  style: const TextStyle(fontSize: 12, color: AppTheme.textMuted),
+                                                ),
+                                            ],
+                                          ),
+                                        ],
                                       ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 6),
-                                  Wrap(
-                                    spacing: 8,
-                                    children: [
-                                      if (product.bookClass != null)
-                                        Text('শ্রেণী: ${product.bookClass}', style: const TextStyle(fontSize: 12, color: Colors.grey)),
-                                      if (product.publisher != null)
-                                        Text('প্রকাশনী: ${product.publisher}', style: const TextStyle(fontSize: 12, color: Colors.grey)),
-                                      Text('বারকোড: ${product.barcode}', style: const TextStyle(fontSize: 12, color: Colors.grey)),
-                                    ],
-                                  ),
-                                  const Divider(height: 16),
-                                  Row(
-                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      Text(
-                                        'গায়ের মূল্য (MRP): ৳${currencyFormat.format(product.mrp)}',
-                                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppTheme.primary),
-                                      ),
-                                      if (isAdmin)
-                                        Text(
-                                          'ক্রয়মূল্য: ৳${currencyFormat.format(product.buyPrice)}',
-                                          style: const TextStyle(fontSize: 13, color: Colors.grey),
-                                        ),
-                                    ],
-                                  ),
-                                ],
-                              ),
+                                    ),
+                                  ],
+                                ),
                               ),
                             ),
                           );

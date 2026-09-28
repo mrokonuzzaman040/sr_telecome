@@ -17,7 +17,7 @@ const cleanConnectionString = connectionString.replace(/[?&]sslmode=[^&]+/, "");
 
 const client = new Client({
   connectionString: cleanConnectionString,
-  ssl: { rejectUnauthorized: false }
+  ssl: { rejectUnauthorized: true }
 });
 
 async function run() {

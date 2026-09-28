@@ -5,6 +5,9 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../providers/store_provider.dart';
 import '../../models/customer.dart';
 import '../../theme/app_theme.dart';
+import '../../widgets/stat_card.dart';
+import '../../widgets/empty_state.dart';
+import '../../widgets/status_badge.dart';
 import 'customer_form_screen.dart';
 
 class CustomerScreen extends StatefulWidget {
@@ -160,55 +163,29 @@ class _CustomerScreenState extends State<CustomerScreen> {
         icon: const Icon(Icons.add),
         label: const Text('নতুন কাস্টমার'),
       ),
+      backgroundColor: AppTheme.backgroundLight,
       body: Column(
         children: [
           // Total Due Summary Banner
-          Container(
-            padding: const EdgeInsets.all(16),
-            color: Colors.white,
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
             child: Row(
               children: [
                 Expanded(
-                  child: Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: Colors.red.shade50,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.red.shade200),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text('মোট বকেয়া (বাকি)', style: TextStyle(fontSize: 12, color: AppTheme.danger)),
-                        const SizedBox(height: 2),
-                        Text(
-                          '৳${currencyFormat.format(totalDue)}',
-                          style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: AppTheme.danger),
-                        ),
-                      ],
-                    ),
+                  child: StatCard(
+                    label: 'মোট বকেয়া (বাকি)',
+                    value: '৳${currencyFormat.format(totalDue)}',
+                    icon: Icons.receipt_long,
+                    color: AppTheme.danger,
                   ),
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: 10),
                 Expanded(
-                  child: Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: Colors.indigo.shade50,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.indigo.shade200),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text('মোট খতিয়ান', style: TextStyle(fontSize: 12, color: AppTheme.secondary)),
-                        const SizedBox(height: 2),
-                        Text(
-                          '${store.customers.length} জন',
-                          style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: AppTheme.secondary),
-                        ),
-                      ],
-                    ),
+                  child: StatCard(
+                    label: 'মোট খতিয়ান',
+                    value: '${store.customers.length} জন',
+                    icon: Icons.people_alt_outlined,
+                    color: AppTheme.secondary,
                   ),
                 ),
               ],
@@ -261,7 +238,10 @@ class _CustomerScreenState extends State<CustomerScreen> {
             child: isLoading
                 ? const Center(child: CircularProgressIndicator())
                 : filtered.isEmpty
-                    ? const Center(child: Text('কোন কাস্টমার মেলেনি', style: TextStyle(color: Colors.grey)))
+                    ? EmptyState(
+                        icon: Icons.people_outline,
+                        message: '\u0995\u09cb\u09a8 \u0995\u09be\u09b8\u09cd\u099f\u09ae\u09be\u09b0 \u09ae\u09c7\u09b2\u09c7\u09a8\u09bf',
+                      )
                     : RefreshIndicator(
                       onRefresh: store.loadAllData,
                       child: ListView.builder(
@@ -270,19 +250,24 @@ class _CustomerScreenState extends State<CustomerScreen> {
                         itemBuilder: (ctx, index) {
                           final customer = filtered[index];
                           return Card(
-                            margin: const EdgeInsets.only(bottom: 8),
+                            margin: const EdgeInsets.only(bottom: 10),
                             child: Padding(
-                              padding: const EdgeInsets.all(12),
+                              padding: const EdgeInsets.all(14),
                               child: Column(
                                 children: [
                                   Row(
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
-                                      CircleAvatar(
-                                        backgroundColor: customer.isAgent ? Colors.amber.shade100 : Colors.teal.shade100,
+                                      Container(
+                                        padding: const EdgeInsets.all(10),
+                                        decoration: BoxDecoration(
+                                          color: (customer.isAgent ? Colors.amber : AppTheme.primary).withValues(alpha: 0.12),
+                                          borderRadius: BorderRadius.circular(12),
+                                        ),
                                         child: Icon(
                                           customer.isAgent ? Icons.storefront : Icons.person,
-                                          color: customer.isAgent ? Colors.amber.shade900 : AppTheme.primary,
+                                          color: customer.isAgent ? Colors.amber.shade800 : AppTheme.primary,
+                                          size: 20,
                                         ),
                                       ),
                                       const SizedBox(width: 12),
@@ -292,43 +277,36 @@ class _CustomerScreenState extends State<CustomerScreen> {
                                           children: [
                                             Row(
                                               children: [
-                                                Text(
-                                                  customer.name,
-                                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                                                Flexible(
+                                                  child: Text(
+                                                    customer.name,
+                                                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                                                    overflow: TextOverflow.ellipsis,
+                                                  ),
                                                 ),
                                                 const SizedBox(width: 6),
-                                                Container(
-                                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
-                                                  decoration: BoxDecoration(
-                                                    color: customer.isAgent ? Colors.amber.shade50 : Colors.blue.shade50,
-                                                    borderRadius: BorderRadius.circular(4),
-                                                  ),
-                                                  child: Text(
-                                                    customer.isAgent ? 'এজেন্ট' : 'খুচরা',
-                                                    style: TextStyle(
-                                                      fontSize: 10,
-                                                      fontWeight: FontWeight.bold,
-                                                      color: customer.isAgent ? Colors.amber.shade900 : Colors.blue.shade900,
-                                                    ),
-                                                  ),
+                                                StatusBadge(
+                                                  label: customer.isAgent ? '\u098f\u099c\u09c7\u09a8\u09cd\u099f' : '\u0996\u09c1\u099a\u09b0\u09be',
+                                                  color: customer.isAgent ? Colors.amber.shade800 : AppTheme.secondary,
                                                 ),
                                               ],
                                             ),
-                                            Text(customer.phone, style: TextStyle(color: Colors.grey.shade600, fontSize: 13)),
+                                            const SizedBox(height: 3),
+                                            Text(customer.phone, style: const TextStyle(color: AppTheme.textMuted, fontSize: 12.5)),
                                             if (customer.address != null)
-                                              Text(customer.address!, style: TextStyle(color: Colors.grey.shade500, fontSize: 12)),
+                                              Text(customer.address!, style: const TextStyle(color: AppTheme.textFaint, fontSize: 11.5)),
                                           ],
                                         ),
                                       ),
                                       Column(
                                         crossAxisAlignment: CrossAxisAlignment.end,
                                         children: [
-                                          const Text('বর্তমান বাকি', style: TextStyle(fontSize: 11, color: Colors.grey)),
+                                          const Text('\u09ac\u09b0\u09cd\u09a4\u09ae\u09be\u09a8 \u09ac\u09be\u0995\u09bf', style: TextStyle(fontSize: 10.5, color: AppTheme.textFaint)),
                                           Text(
-                                            '৳${currencyFormat.format(customer.currentDue)}',
+                                            '\u09f3${currencyFormat.format(customer.currentDue)}',
                                             style: TextStyle(
                                               fontSize: 16,
-                                              fontWeight: FontWeight.bold,
+                                              fontWeight: FontWeight.w800,
                                               color: customer.currentDue > 0 ? AppTheme.danger : AppTheme.success,
                                             ),
                                           ),
@@ -336,7 +314,7 @@ class _CustomerScreenState extends State<CustomerScreen> {
                                       ),
                                     ],
                                   ),
-                                  const Divider(height: 16),
+                                  const Divider(height: 20),
                                   Row(
                                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                     children: [
@@ -368,7 +346,7 @@ class _CustomerScreenState extends State<CustomerScreen> {
                                             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                                           ),
                                           icon: const Icon(Icons.attach_money, size: 16),
-                                          label: const Text('বাকি আদায়'),
+                                          label: const Text('\u09ac\u09be\u0995\u09bf \u0986\u09a6\u09be\u09df'),
                                           onPressed: () => _showDueCollectionModal(customer),
                                         ),
                                     ],

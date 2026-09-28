@@ -3,6 +3,8 @@ import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import '../../providers/store_provider.dart';
 import '../../theme/app_theme.dart';
+import '../../widgets/empty_state.dart';
+import '../../widgets/status_badge.dart';
 import 'cart_modal.dart';
 import 'barcode_scanner_screen.dart';
 
@@ -97,6 +99,7 @@ class _PosScreenState extends State<PosScreen> {
           ),
         ],
       ),
+      backgroundColor: AppTheme.backgroundLight,
       body: Column(
         children: [
           // Search & Scanner Header
@@ -156,23 +159,11 @@ class _PosScreenState extends State<PosScreen> {
             child: isLoading
                 ? const Center(child: CircularProgressIndicator())
                 : filtered.isEmpty
-                    ? Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            const Icon(Icons.inventory_2_outlined, size: 54, color: Colors.grey),
-                            const SizedBox(height: 8),
-                            const Text('কোন পণ্য পাওয়া যায়নি', style: TextStyle(color: Colors.grey)),
-                            if (store.products.isEmpty)
-                              Padding(
-                                padding: const EdgeInsets.only(top: 8),
-                                child: ElevatedButton(
-                                  onPressed: () => store.loadAllData(),
-                                  child: const Text('তথ্য রিফ্রেশ করুন'),
-                                ),
-                              ),
-                          ],
-                        ),
+                    ? EmptyState(
+                        icon: Icons.inventory_2_outlined,
+                        message: '\u0995\u09cb\u09a8 \u09aa\u09a3\u09cd\u09af \u09aa\u09be\u0993\u09df\u09be \u09af\u09be\u09df\u09a8\u09bf',
+                        actionLabel: store.products.isEmpty ? '\u09a4\u09a5\u09cd\u09af \u09b0\u09bf\u09ab\u09cd\u09b0\u09c7\u09b6 \u0995\u09b0\u09c1\u09a8' : null,
+                        onAction: store.products.isEmpty ? store.loadAllData : null,
                       )
                     : RefreshIndicator(
                       onRefresh: store.loadAllData,
@@ -182,83 +173,75 @@ class _PosScreenState extends State<PosScreen> {
                         itemBuilder: (ctx, index) {
                           final product = filtered[index];
                           return Card(
-                            margin: const EdgeInsets.only(bottom: 8),
-                            child: ListTile(
-                              contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
-                              title: Text(
-                                product.displayName,
-                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                              subtitle: Column(
+                            margin: const EdgeInsets.only(bottom: 10),
+                            clipBehavior: Clip.antiAlias,
+                            child: Padding(
+                              padding: const EdgeInsets.all(12),
+                              child: Row(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  const SizedBox(height: 4),
-                                  Wrap(
-                                    spacing: 6,
-                                    children: [
-                                      if (product.bookClass != null)
-                                        Container(
-                                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                          decoration: BoxDecoration(
-                                            color: Colors.indigo.shade50,
-                                            borderRadius: BorderRadius.circular(4),
-                                          ),
-                                          child: Text(
-                                            product.bookClass!,
-                                            style: TextStyle(fontSize: 11, color: Colors.indigo.shade800),
-                                          ),
-                                        ),
-                                      if (product.publisher != null)
-                                        Container(
-                                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                          decoration: BoxDecoration(
-                                            color: Colors.teal.shade50,
-                                            borderRadius: BorderRadius.circular(4),
-                                          ),
-                                          child: Text(
-                                            product.publisher!,
-                                            style: TextStyle(fontSize: 11, color: Colors.teal.shade800),
-                                          ),
-                                        ),
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                        decoration: BoxDecoration(
-                                          color: product.stockQty <= product.minStockAlert ? Colors.red.shade50 : Colors.green.shade50,
-                                          borderRadius: BorderRadius.circular(4),
-                                        ),
-                                        child: Text(
-                                          'স্টক: ${product.stockQty}',
-                                          style: TextStyle(
-                                            fontSize: 11,
-                                            color: product.stockQty <= product.minStockAlert ? AppTheme.danger : AppTheme.success,
-                                            fontWeight: FontWeight.bold,
-                                          ),
-                                        ),
-                                      ),
-                                    ],
+                                  Container(
+                                    padding: const EdgeInsets.all(10),
+                                    decoration: BoxDecoration(
+                                      color: (product.category == 'book' ? AppTheme.secondary : Colors.orange).withValues(alpha: 0.1),
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    child: Icon(
+                                      product.category == 'book' ? Icons.menu_book_rounded : Icons.inventory_2_rounded,
+                                      color: product.category == 'book' ? AppTheme.secondary : Colors.orange.shade800,
+                                      size: 20,
+                                    ),
                                   ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    'গায়ের মূল্য: ৳${currencyFormat.format(product.mrp)}',
-                                    style: const TextStyle(fontWeight: FontWeight.bold, color: AppTheme.primary, fontSize: 14),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          product.displayName,
+                                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                                          maxLines: 2,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                        const SizedBox(height: 6),
+                                        Wrap(
+                                          spacing: 6,
+                                          runSpacing: 6,
+                                          children: [
+                                            if (product.bookClass != null)
+                                              StatusBadge(label: product.bookClass!, color: AppTheme.secondary, bold: false),
+                                            if (product.publisher != null)
+                                              StatusBadge(label: product.publisher!, color: Colors.teal, bold: false),
+                                            StatusBadge(
+                                              label: '\u09b8\u09cd\u099f\u0995: ${product.stockQty}',
+                                              color: product.stockQty <= product.minStockAlert ? AppTheme.danger : AppTheme.success,
+                                            ),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 8),
+                                        Text(
+                                          '\u09f3${currencyFormat.format(product.mrp)}',
+                                          style: const TextStyle(fontWeight: FontWeight.w800, color: AppTheme.primary, fontSize: 15.5),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  IconButton.filled(
+                                    style: IconButton.styleFrom(backgroundColor: AppTheme.primary),
+                                    icon: const Icon(Icons.add_shopping_cart, size: 20),
+                                    onPressed: () {
+                                      store.addToCart(product);
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(
+                                          content: Text('${product.displayName} \u09af\u09cb\u0997 \u09b9\u09df\u09c7\u099b\u09c7'),
+                                          duration: const Duration(milliseconds: 700),
+                                          behavior: SnackBarBehavior.floating,
+                                        ),
+                                      );
+                                    },
                                   ),
                                 ],
-                              ),
-                              trailing: IconButton.filled(
-                                style: IconButton.styleFrom(backgroundColor: AppTheme.primary),
-                                icon: const Icon(Icons.add_shopping_cart, size: 20),
-                                onPressed: () {
-                                  store.addToCart(product);
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      content: Text('${product.displayName} যোগ হয়েছে'),
-                                      duration: const Duration(milliseconds: 700),
-                                      behavior: SnackBarBehavior.floating,
-                                    ),
-                                  );
-                                },
                               ),
                             ),
                           );
@@ -276,7 +259,7 @@ class _PosScreenState extends State<PosScreen> {
                 color: const Color(0xFF0F172A),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.2),
+                    color: Colors.black.withValues(alpha: 0.2),
                     blurRadius: 10,
                     offset: const Offset(0, -3),
                   ),
@@ -328,7 +311,7 @@ class _PosScreenState extends State<PosScreen> {
       child: FilterChip(
         selected: isSelected,
         label: Text(label),
-        selectedColor: AppTheme.primary.withOpacity(0.15),
+        selectedColor: AppTheme.primary.withValues(alpha: 0.15),
         checkmarkColor: AppTheme.primary,
         labelStyle: TextStyle(
           color: isSelected ? AppTheme.primary : Colors.black87,

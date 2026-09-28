@@ -45,5 +45,7 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<key>NSFaceIDUsageDescription</key>
+	<string>অ্যাপ আনলক করতে Face ID ব্যবহার করা হবে, পিন কোডের বিকল্প হিসেবে।</string>
 </dict>
 </plist>

@@ -23,14 +23,19 @@ export async function GET(req: NextRequest) {
   }
 }
 
+const NOTIFICATION_TYPES = new Set(["sale", "low_stock", "due", "system"]);
+
 export async function POST(req: NextRequest) {
   try {
-    const auth = await verifyAuth(req);
+    const auth = await verifyAuth(req, { requiredRole: "admin" });
     if (!auth.success) return auth.response;
 
     const body = await req.json();
-    const id = body.id || `notif-${Date.now()}`;
-    const { type = "system", title, message, metadata = {} } = body;
+    // Server-generated id only - never trust a client-supplied id for a
+    // shared, global notification feed.
+    const id = `notif-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const { title, message, metadata = {} } = body;
+    const type = NOTIFICATION_TYPES.has(body.type) ? body.type : "system";
 
     if (!title || !message) {
       return NextResponse.json(
@@ -62,6 +67,14 @@ export async function PATCH(req: NextRequest) {
     const { id, all } = body;
 
     if (all) {
+      // Notifications are a shared global feed (no per-user read state yet),
+      // so bulk mark-all-read affects every user - restrict it to admins.
+      if (auth.user.role !== "admin") {
+        return NextResponse.json(
+          { error: "Forbidden: admin privileges required." },
+          { status: 403 }
+        );
+      }
       await query(`UPDATE notifications SET is_read = TRUE WHERE is_read = FALSE`);
     } else if (id) {
       await query(`UPDATE notifications SET is_read = TRUE WHERE id = $1`, [id]);

@@ -4,6 +4,7 @@ import 'providers/auth_provider.dart';
 import 'providers/store_provider.dart';
 import 'screens/login_screen.dart';
 import 'screens/home_screen.dart';
+import 'screens/lock_screen.dart';
 import 'theme/app_theme.dart';
 import 'widgets/loading_screen.dart';
 
@@ -30,9 +31,11 @@ class SRTelecomApp extends StatelessWidget {
             theme: AppTheme.lightTheme,
             home: auth.isLoading
                 ? const LoadingScreen()
-                : auth.isAuthenticated
-                    ? const HomeScreen()
-                    : const LoginScreen(),
+                : !auth.isAuthenticated
+                    ? const LoginScreen()
+                    : auth.needsUnlock
+                        ? const LockScreen()
+                        : const HomeScreen(),
           );
         },
       ),
