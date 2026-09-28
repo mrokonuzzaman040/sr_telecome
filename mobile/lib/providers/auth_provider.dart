@@ -7,6 +7,7 @@ import '../services/api_service.dart';
 class AuthProvider extends ChangeNotifier {
   static const String _userJsonKey = 'sr_auth_user_json';
   static const String _biometricLockKey = 'sr_biometric_lock_enabled';
+  static const String _userPinKey = 'sr_auth_user_pin';
 
   AppUser? _currentUser;
   bool _isLoading = true;
@@ -67,7 +68,15 @@ class AuthProvider extends ChangeNotifier {
 
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_userJsonKey, jsonEncode(user.toJson()));
+    // Store PIN for biometric login (encrypted storage should be used in production)
+    await prefs.setString('$_userPinKey$username', pin);
     notifyListeners();
+  }
+
+  /// Get stored PIN for a specific username (for biometric login)
+  Future<String?> getStoredPin(String username) async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString('$_userPinKey$username');
   }
 
   /// Re-verifies the admin PIN against the backend without changing the

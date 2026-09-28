@@ -260,10 +260,15 @@ class _CartModalState extends State<CartModal> {
                     isDense: true,
                   ),
                   hint: const Text('সাধারণ ক্রেতা (Walk-in)'),
+                  isExpanded: true,
                   items: store.customers.map((c) {
                     return DropdownMenuItem<Customer>(
                       value: c,
-                      child: Text('${c.name} (${c.type == 'agent' ? 'এজেন্ট' : 'খুচরা'}) - বাকি: ৳${c.currentDue.toInt()}'),
+                      child: Text(
+                        '${c.name} (${c.type == 'agent' ? 'এজেন্ট' : 'খুচরা'}) - বাকি: ৳${c.currentDue.toInt()}',
+                        overflow: TextOverflow.ellipsis,
+                        maxLines: 1,
+                      ),
                     );
                   }).toList(),
                   onChanged: (c) {

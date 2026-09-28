@@ -3,9 +3,11 @@ import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/store_provider.dart';
 import '../../providers/theme_provider.dart';
+import '../../providers/language_provider.dart';
 import '../../services/biometric_service.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/section_header.dart';
+import '../../l10n/app_localizations.dart';
 import 'printer_settings_screen.dart';
 import 'backup_screen.dart';
 
@@ -30,16 +32,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   Future<void> _toggleBiometricLock(bool enable) async {
     final auth = Provider.of<AuthProvider>(context, listen: false);
+    final languageProvider = Provider.of<LanguageProvider>(context, listen: false);
+    final loc = AppLocalizations.of(languageProvider.currentLocale);
+    
     setState(() => _isTogglingBiometric = true);
     try {
       if (enable) {
         final confirmed = await BiometricService.authenticate(
-          reason: 'বায়োমেট্রিক লক চালু করতে যাচাই করুন',
+          reason: loc.get('biometric_reason'),
         );
         if (!confirmed) {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('যাচাই ব্যর্থ হয়েছে, লক চালু হয়নি'), backgroundColor: AppTheme.danger),
+              SnackBar(content: Text(loc.get('biometric_verify_failed')), backgroundColor: AppTheme.danger),
             );
           }
           return;
@@ -49,7 +54,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(enable ? 'বায়োমেট্রিক লক চালু হয়েছে' : 'বায়োমেট্রিক লক বন্ধ হয়েছে'),
+            content: Text(enable ? loc.get('biometric_lock_enabled') : loc.get('biometric_lock_disabled')),
             backgroundColor: AppTheme.success,
           ),
         );
@@ -63,12 +68,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Widget build(BuildContext context) {
     final auth = Provider.of<AuthProvider>(context);
     final store = Provider.of<StoreProvider>(context);
+    final languageProvider = Provider.of<LanguageProvider>(context);
+    final loc = AppLocalizations.of(languageProvider.currentLocale);
     final user = auth.currentUser;
 
     return Scaffold(
       backgroundColor: AppTheme.backgroundLight,
       appBar: AppBar(
-        title: const Text('সিস্টেম সেটিংস'),
+        title: Text(loc.get('system_settings')),
       ),
       body: ListView(
         padding: const EdgeInsets.all(16),
@@ -104,12 +111,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        user?.name ?? 'ব্যবহারকারী',
+                        user?.name ?? loc.get('username'),
                         style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15.5, color: Colors.white),
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        auth.isAdmin ? 'মালিক (Proprietor / Full Access)' : 'বিক্রয়কর্মী (Cashier / POS Only)',
+                        auth.isAdmin ? loc.get('owner') : 'বিক্রয়কর্মী (Cashier / POS Only)',
                         style: const TextStyle(fontSize: 12, color: Colors.white70),
                       ),
                     ],
@@ -117,7 +124,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ),
                 IconButton(
                   icon: const Icon(Icons.logout, color: Colors.white),
-                  tooltip: 'লগআউট',
+                  tooltip: loc.get('logout'),
                   onPressed: () => auth.logout(),
                 ),
               ],
@@ -125,7 +132,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
           const SizedBox(height: 20),
 
-          SectionHeader(title: 'সুরক্ষা'),
+          SectionHeader(title: loc.get('security')),
           if (_biometricAvailable) ...[
             Card(
               child: SwitchListTile(
@@ -134,8 +141,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   decoration: BoxDecoration(color: AppTheme.secondary.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(10)),
                   child: const Icon(Icons.fingerprint, color: AppTheme.secondary, size: 20),
                 ),
-                title: const Text('বায়োমেট্রিক লক', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
-                subtitle: const Text('পিনের বদলে ফিঙ্গারপ্রিন্ট/ফেইস দিয়ে অ্যাপ আনলক করুন', style: TextStyle(fontSize: 11.5)),
+                title: Text(loc.get('biometric_lock'), style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+                subtitle: Text(loc.get('biometric_lock_desc'), style: const TextStyle(fontSize: 11.5)),
                 value: auth.biometricLockEnabled,
                 onChanged: _isTogglingBiometric ? null : _toggleBiometricLock,
               ),
@@ -143,12 +150,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
             const SizedBox(height: 10),
           ],
 
+          // ── Language Switcher ─────────────────────────────────────────
+          SectionHeader(title: 'ভাষা / Language'),
+          const _LanguageSwitcher(),
+          const SizedBox(height: 20),
+          // ──────────────────────────────────────────────────────────────
+
           // ── Theme Color Picker ─────────────────────────────────────────
-          SectionHeader(title: 'থিম রঙ (Appearance)'),
+          SectionHeader(title: loc.get('appearance')),
           const _ThemeColorPicker(),
           const SizedBox(height: 20),
           // ──────────────────────────────────────────────────────────────
-          SectionHeader(title: 'হার্ডওয়েয়ার'),
+          SectionHeader(title: loc.get('hardware')),
           Card(
             child: ListTile(
               leading: Container(
@@ -156,8 +169,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 decoration: BoxDecoration(color: AppTheme.secondary.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(10)),
                 child: const Icon(Icons.print_outlined, color: AppTheme.secondary, size: 20),
               ),
-              title: const Text('থার্মাল প্রিন্টার (Bluetooth POS)', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
-              subtitle: const Text('৫৮মিমি / ৮০মিমি ব্লুটুথ থার্মাল রিসিট প্রিন্টার', style: TextStyle(fontSize: 11.5)),
+              title: Text(loc.get('thermal_printer'), style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+              subtitle: Text(loc.get('thermal_printer_desc'), style: const TextStyle(fontSize: 11.5)),
               trailing: const Icon(Icons.chevron_right, color: AppTheme.textFaint),
               onTap: () => Navigator.push(
                 context,
@@ -175,8 +188,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   decoration: BoxDecoration(color: AppTheme.secondary.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(10)),
                   child: const Icon(Icons.backup_outlined, color: AppTheme.secondary, size: 20),
                 ),
-                title: const Text('ডাটাবেস ব্যাকআপ', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
-                subtitle: const Text('সার্ভার স্ন্যাপশট ও লোকাল JSON এক্সপোর্ট', style: TextStyle(fontSize: 11.5)),
+                title: Text(loc.get('database_backup'), style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+                subtitle: Text(loc.get('database_backup_desc'), style: const TextStyle(fontSize: 11.5)),
                 trailing: const Icon(Icons.chevron_right, color: AppTheme.textFaint),
                 onTap: () => Navigator.push(
                   context,
@@ -187,17 +200,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ],
           const SizedBox(height: 20),
 
-          SectionHeader(title: 'দোকানের তথ্য'),
+          SectionHeader(title: loc.get('shop_info')),
           Card(
             child: Padding(
               padding: const EdgeInsets.all(16),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _infoRow(Icons.storefront_outlined, 'এস.আর টেলিকম & লাইব্রেরী (SR Telecom & Library)'),
-                  _infoRow(Icons.person_outline, 'প্রোপাইটর: মো: রোকনুজ্জামান'),
-                  _infoRow(Icons.category_outlined, 'সার্ভিস: বই, স্টেশনারী ও টেলিকম এক্সেসরিজ'),
-                  _infoRow(Icons.info_outline, 'ভার্সন: v1.0.0 (Flutter Mobile Edition)', isLast: true),
+                  _infoRow(Icons.storefront_outlined, loc.get('app_name')),
+                  _infoRow(Icons.person_outline, loc.get('proprietor')),
+                  _infoRow(Icons.category_outlined, loc.get('services')),
+                  _infoRow(Icons.info_outline, loc.get('version'), isLast: true),
                 ],
               ),
             ),
@@ -310,6 +323,139 @@ class _ThemeColorPicker extends StatelessWidget {
             Text(
               'বর্তমান: ${themeProvider.selectedOption.labelBn} • থিম বাছাই সাথে সাথে সর্বত্র প্রয়োগ হবে',
               style: const TextStyle(fontSize: 11, color: AppTheme.textMuted),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// ─────────────────────────────────────────────────────────────────────────
+/// Language Switcher widget — displayed inside SettingsScreen.
+/// ─────────────────────────────────────────────────────────────────────────
+class _LanguageSwitcher extends StatelessWidget {
+  const _LanguageSwitcher();
+
+  @override
+  Widget build(BuildContext context) {
+    final languageProvider = Provider.of<LanguageProvider>(context);
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(Icons.language_outlined,
+                      color: Theme.of(context).colorScheme.primary, size: 20),
+                ),
+                const SizedBox(width: 12),
+                const Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'ভাষা পরিবর্তন করুন',
+                        style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+                      ),
+                      SizedBox(height: 2),
+                      Text(
+                        'Change Language',
+                        style: TextStyle(fontSize: 11.5, color: AppTheme.textMuted),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 14),
+            Row(
+              children: [
+                Expanded(
+                  child: _LanguageOption(
+                    label: 'বাংলা',
+                    sublabel: 'Bangla',
+                    isSelected: languageProvider.isBangla,
+                    onTap: () => languageProvider.setLanguage('bn'),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _LanguageOption(
+                    label: 'English',
+                    sublabel: 'ইংরেজি',
+                    isSelected: languageProvider.isEnglish,
+                    onTap: () => languageProvider.setLanguage('en'),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _LanguageOption extends StatelessWidget {
+  final String label;
+  final String sublabel;
+  final bool isSelected;
+  final VoidCallback onTap;
+
+  const _LanguageOption({
+    required this.label,
+    required this.sublabel,
+    required this.isSelected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
+        decoration: BoxDecoration(
+          color: isSelected 
+              ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.1)
+              : Colors.transparent,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isSelected 
+                ? Theme.of(context).colorScheme.primary
+                : AppTheme.border,
+            width: isSelected ? 2 : 1,
+          ),
+        ),
+        child: Column(
+          children: [
+            Text(
+              label,
+              style: TextStyle(
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                fontSize: 15,
+                color: isSelected 
+                    ? Theme.of(context).colorScheme.primary
+                    : AppTheme.textDark,
+              ),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              sublabel,
+              style: TextStyle(
+                fontSize: 11,
+                color: AppTheme.textMuted,
+              ),
             ),
           ],
         ),

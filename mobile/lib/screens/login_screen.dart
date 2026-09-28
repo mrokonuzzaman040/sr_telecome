@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
+import '../providers/language_provider.dart';
 import '../services/api_service.dart';
+import '../services/biometric_service.dart';
 import '../theme/app_theme.dart';
+import '../l10n/app_localizations.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -16,6 +19,8 @@ class _LoginScreenState extends State<LoginScreen> {
   String _username = 'admin'; // matches seeded web-app usernames: admin / cashier
   String? _errorMessage;
   bool _isSubmitting = false;
+  bool _isBiometricAvailable = false;
+  bool _isBiometricAuthenticating = false;
   String _serverUrl = ApiService.defaultBaseUrl;
 
   @override
@@ -23,6 +28,9 @@ class _LoginScreenState extends State<LoginScreen> {
     super.initState();
     ApiService.getBaseUrl().then((url) {
       if (mounted) setState(() => _serverUrl = url);
+    });
+    BiometricService.isAvailable().then((available) {
+      if (mounted) setState(() => _isBiometricAvailable = available);
     });
   }
 
@@ -60,6 +68,8 @@ class _LoginScreenState extends State<LoginScreen> {
       await auth.login(_username, _pin);
     } catch (e) {
       if (!mounted) return;
+      final languageProvider = Provider.of<LanguageProvider>(context, listen: false);
+      final loc = AppLocalizations.of(languageProvider.currentLocale);
       setState(() {
         _errorMessage = e.toString().replaceFirst('Exception: ', '');
         _pin = '';
@@ -69,7 +79,55 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
+  Future<void> _biometricLogin() async {
+    if (_isBiometricAuthenticating || _isSubmitting) return;
+    final languageProvider = Provider.of<LanguageProvider>(context, listen: false);
+    final loc = AppLocalizations.of(languageProvider.currentLocale);
+    
+    setState(() {
+      _isBiometricAuthenticating = true;
+      _errorMessage = null;
+    });
+
+    try {
+      final success = await BiometricService.authenticate(
+        reason: loc.get('biometric_reason'),
+      );
+
+      if (!mounted) return;
+
+      if (success) {
+        // After successful biometric, attempt login with stored credentials
+        final auth = Provider.of<AuthProvider>(context, listen: false);
+        try {
+          // Get stored PIN for biometric login
+          final storedPin = await auth.getStoredPin(_username);
+          if (storedPin != null) {
+            await auth.login(_username, storedPin);
+          } else {
+            // If no stored PIN, prompt user to login with PIN first
+            if (mounted) {
+              setState(() {
+                _errorMessage = loc.get('biometric_login_first');
+              });
+            }
+          }
+        } catch (e) {
+          if (mounted) {
+            setState(() {
+              _errorMessage = loc.get('biometric_login_error');
+            });
+          }
+        }
+      }
+    } finally {
+      if (mounted) setState(() => _isBiometricAuthenticating = false);
+    }
+  }
+
   void _showServerDialog() {
+    final languageProvider = Provider.of<LanguageProvider>(context, listen: false);
+    final loc = AppLocalizations.of(languageProvider.currentLocale);
     final controller = TextEditingController(text: _serverUrl);
     bool testing = false;
     String? testMsg;
@@ -83,16 +141,16 @@ class _LoginScreenState extends State<LoginScreen> {
             children: [
               Icon(Icons.dns_rounded, color: Theme.of(context).colorScheme.primary),
               const SizedBox(width: 8),
-              const Text('সার্ভার সেটিংস', style: TextStyle(fontSize: 16)),
+              Text(loc.get('server_settings'), style: const TextStyle(fontSize: 16)),
             ],
           ),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
-                'API সার্ভার ঠিকানা (Vercel বা লোকাল IP):',
-                style: TextStyle(fontSize: 12, color: AppTheme.textMuted),
+              Text(
+                loc.get('api_server_address'),
+                style: const TextStyle(fontSize: 12, color: AppTheme.textMuted),
               ),
               const SizedBox(height: 8),
               TextField(
@@ -139,7 +197,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         : () async {
                             setDialogState(() {
                               testing = true;
-                              testMsg = 'পিং হচ্ছে...';
+                              testMsg = loc.get('pinging');
                             });
                             final r = await ApiService.testConnection(controller.text);
                             setDialogState(() {
@@ -151,12 +209,12 @@ class _LoginScreenState extends State<LoginScreen> {
                     icon: testing
                         ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
                         : const Icon(Icons.wifi_tethering, size: 16),
-                    label: const Text('টেস্ট', style: TextStyle(fontSize: 12)),
+                    label: Text(loc.get('test'), style: const TextStyle(fontSize: 12)),
                   ),
                   const Spacer(),
                   TextButton(
                     onPressed: () => controller.text = ApiService.defaultBaseUrl,
-                    child: const Text('ডিফল্ট', style: TextStyle(fontSize: 12)),
+                    child: Text(loc.get('default'), style: const TextStyle(fontSize: 12)),
                   ),
                 ],
               ),
@@ -165,7 +223,7 @@ class _LoginScreenState extends State<LoginScreen> {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx),
-              child: const Text('বাতিল'),
+              child: Text(loc.get('cancel')),
             ),
             ElevatedButton(
               onPressed: () async {
@@ -176,7 +234,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   if (ctx.mounted) Navigator.pop(ctx);
                 }
               },
-              child: const Text('সংরক্ষণ'),
+              child: Text(loc.get('save_server')),
             ),
           ],
         ),
@@ -186,6 +244,9 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final languageProvider = Provider.of<LanguageProvider>(context);
+    final loc = AppLocalizations.of(languageProvider.currentLocale);
+    
     return Scaffold(
       backgroundColor: const Color(0xFF0F172A), // Dark slate
       body: SafeArea(
@@ -237,24 +298,56 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                     ),
                     const SizedBox(height: 16),
-                    const Text(
-                      'এস.আর টেলিকম & লাইব্রেরী',
-                      style: TextStyle(
+                    Text(
+                      loc.get('app_name'),
+                      style: const TextStyle(
                         fontSize: 22,
                         fontWeight: FontWeight.bold,
                         color: Colors.white,
                       ),
                     ),
                     const SizedBox(height: 4),
-                    const Text(
-                      'SR Telecom & Library Mobile POS',
-                      style: TextStyle(
+                    Text(
+                      loc.get('app_subtitle'),
+                      style: const TextStyle(
                         fontSize: 12.5,
                         color: Colors.white70,
                         letterSpacing: 0.5,
                       ),
                     ),
                     const SizedBox(height: 20),
+
+                    // Biometric login button (if available)
+                    if (_isBiometricAvailable) ...[
+                      Container(
+                        width: double.infinity,
+                        constraints: const BoxConstraints(maxWidth: 320),
+                        child: ElevatedButton.icon(
+                          onPressed: _isBiometricAuthenticating ? null : _biometricLogin,
+                          icon: _isBiometricAuthenticating
+                              ? const SizedBox(
+                                  width: 18,
+                                  height: 18,
+                                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                                )
+                              : const Icon(Icons.fingerprint, size: 22),
+                          label: Text(
+                            _isBiometricAuthenticating ? loc.get('biometric_authenticating') : loc.get('biometric_login'),
+                            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+                          ),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.white.withValues(alpha: 0.15),
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              side: const BorderSide(color: Colors.white24),
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                    ],
 
                     // Role selector — picks which username the PIN is checked against
                     Container(
@@ -266,8 +359,8 @@ class _LoginScreenState extends State<LoginScreen> {
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          _buildRoleChip('মালিক (Admin)', 'admin'),
-                          _buildRoleChip('বিক্রয়কর্মী (Cashier)', 'cashier'),
+                          _buildRoleChip(loc.get('admin_role'), 'admin'),
+                          _buildRoleChip(loc.get('cashier_role'), 'cashier'),
                         ],
                       ),
                     ),

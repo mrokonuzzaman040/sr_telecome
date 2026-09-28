@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
+import '../providers/language_provider.dart';
 import '../services/biometric_service.dart';
 import '../theme/app_theme.dart';
+import '../l10n/app_localizations.dart';
 
 class LockScreen extends StatefulWidget {
   const LockScreen({super.key});
@@ -51,8 +53,11 @@ class _LockScreenState extends State<LockScreen> with WidgetsBindingObserver {
       return;
     }
 
+    final languageProvider = Provider.of<LanguageProvider>(context, listen: false);
+    final loc = AppLocalizations.of(languageProvider.currentLocale);
+
     final success = await BiometricService.authenticate(
-      reason: 'এস.আর টেলিকম & লাইব্রেরী আনলক করতে যাচাই করুন',
+      reason: loc.get('biometric_unlock_reason'),
     );
 
     if (!mounted) return;
@@ -88,11 +93,14 @@ class _LockScreenState extends State<LockScreen> with WidgetsBindingObserver {
   Future<void> _submitPin() async {
     setState(() => _isVerifyingPin = true);
     final auth = Provider.of<AuthProvider>(context, listen: false);
+    final languageProvider = Provider.of<LanguageProvider>(context, listen: false);
+    final loc = AppLocalizations.of(languageProvider.currentLocale);
+    
     final ok = await auth.unlockWithPin(_pin);
     if (!mounted) return;
     if (!ok) {
       setState(() {
-        _errorMessage = 'ভুল পিন কোড!';
+        _errorMessage = loc.get('wrong_pin');
         _pin = '';
         _isVerifyingPin = false;
       });
@@ -102,6 +110,8 @@ class _LockScreenState extends State<LockScreen> with WidgetsBindingObserver {
   @override
   Widget build(BuildContext context) {
     final auth = Provider.of<AuthProvider>(context, listen: false);
+    final languageProvider = Provider.of<LanguageProvider>(context, listen: false);
+    final loc = AppLocalizations.of(languageProvider.currentLocale);
     final user = auth.currentUser;
 
     return Scaffold(
@@ -124,7 +134,7 @@ class _LockScreenState extends State<LockScreen> with WidgetsBindingObserver {
                 ),
                 const SizedBox(height: 16),
                 Text(
-                  user?.name ?? 'অ্যাপ লক করা আছে',
+                  user?.name ?? loc.get('app_locked'),
                   style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white),
                 ),
                 const SizedBox(height: 24),
@@ -139,14 +149,14 @@ class _LockScreenState extends State<LockScreen> with WidgetsBindingObserver {
                         ElevatedButton.icon(
                           onPressed: _promptBiometric,
                           icon: const Icon(Icons.fingerprint),
-                          label: const Text('আবার চেষ্টা করুন'),
+                          label: Text(loc.get('try_again')),
                         ),
                       ],
                     ),
                   const SizedBox(height: 20),
                   TextButton(
                     onPressed: () => setState(() => _showPinFallback = true),
-                    child: const Text('পিন দিয়ে আনলক করুন', style: TextStyle(color: Colors.white70)),
+                    child: Text(loc.get('unlock_with_pin'), style: const TextStyle(color: Colors.white70)),
                   ),
                 ] else ...[
                   Row(
@@ -202,13 +212,13 @@ class _LockScreenState extends State<LockScreen> with WidgetsBindingObserver {
                       _pin = '';
                       _errorMessage = null;
                     }),
-                    child: const Text('বায়োমেট্রিক দিয়ে চেষ্টা করুন', style: TextStyle(color: Colors.white70)),
+                    child: Text(loc.get('try_biometric'), style: const TextStyle(color: Colors.white70)),
                   ),
                 ],
                 const SizedBox(height: 16),
                 TextButton(
                   onPressed: () => auth.logout(),
-                  child: const Text('লগআউট করুন', style: TextStyle(color: AppTheme.danger)),
+                  child: Text(loc.get('logout_confirm'), style: const TextStyle(color: AppTheme.danger)),
                 ),
               ],
             ),
