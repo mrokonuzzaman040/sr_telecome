@@ -4,6 +4,7 @@ import '../models/customer.dart';
 import '../models/sale.dart';
 import '../models/expense.dart';
 import '../models/publisher.dart';
+import '../models/return_record.dart';
 import '../services/api_service.dart';
 
 class StoreProvider extends ChangeNotifier {
@@ -12,9 +13,28 @@ class StoreProvider extends ChangeNotifier {
   List<Sale> _sales = [];
   List<Expense> _expenses = [];
   List<Publisher> _publishers = [];
+  List<ReturnRecord> _returns = [];
 
   bool _isLoading = false;
   String? _errorMessage;
+
+  // Bumped only when the matching list actually changes (load / create /
+  // update / stock or due adjustment) - lets screens use context.select on a
+  // single int to rebuild only when their own data changes, instead of on
+  // every notifyListeners() call from unrelated state (e.g. the POS cart).
+  int _productsVersion = 0;
+  int _customersVersion = 0;
+  int _salesVersion = 0;
+  int _expensesVersion = 0;
+  int _publishersVersion = 0;
+  int _returnsVersion = 0;
+
+  int get productsVersion => _productsVersion;
+  int get customersVersion => _customersVersion;
+  int get salesVersion => _salesVersion;
+  int get expensesVersion => _expensesVersion;
+  int get publishersVersion => _publishersVersion;
+  int get returnsVersion => _returnsVersion;
 
   // Cart State for POS
   final List<SaleItem> _cart = [];
@@ -30,6 +50,7 @@ class StoreProvider extends ChangeNotifier {
   List<Sale> get sales => _sales;
   List<Expense> get expenses => _expenses;
   List<Publisher> get publishers => _publishers;
+  List<ReturnRecord> get returns => _returns;
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
 
@@ -61,6 +82,7 @@ class StoreProvider extends ChangeNotifier {
         ApiService.fetchSales().catchError((_) => <Sale>[]),
         ApiService.fetchExpenses().catchError((_) => <Expense>[]),
         ApiService.fetchPublishers().catchError((_) => <Publisher>[]),
+        ApiService.fetchReturns().catchError((_) => <ReturnRecord>[]),
       ]);
 
       _products = results[0] as List<Product>;
@@ -68,6 +90,13 @@ class StoreProvider extends ChangeNotifier {
       _sales = results[2] as List<Sale>;
       _expenses = results[3] as List<Expense>;
       _publishers = results[4] as List<Publisher>;
+      _returns = results[5] as List<ReturnRecord>;
+      _productsVersion++;
+      _customersVersion++;
+      _salesVersion++;
+      _expensesVersion++;
+      _publishersVersion++;
+      _returnsVersion++;
     } catch (e) {
       _errorMessage = e.toString();
     } finally {
@@ -225,6 +254,7 @@ class StoreProvider extends ChangeNotifier {
 
     final createdSale = await ApiService.createSale(sale);
     _sales.insert(0, createdSale);
+    _salesVersion++;
 
     // Update local stock quantities
     for (var cartItem in _cart) {
@@ -254,6 +284,7 @@ class StoreProvider extends ChangeNotifier {
       }
     }
 
+    _productsVersion++;
     clearCart();
     notifyListeners();
     return createdSale;
@@ -289,6 +320,7 @@ class StoreProvider extends ChangeNotifier {
         totalPaid: c.totalPaid + amount,
         currentDue: (c.currentDue - amount).clamp(0.0, double.infinity),
       );
+      _customersVersion++;
       notifyListeners();
     }
   }
@@ -297,6 +329,7 @@ class StoreProvider extends ChangeNotifier {
   Future<void> addExpense(Expense expense) async {
     final created = await ApiService.createExpense(expense);
     _expenses.insert(0, created);
+    _expensesVersion++;
     notifyListeners();
   }
 
@@ -304,6 +337,7 @@ class StoreProvider extends ChangeNotifier {
   Future<void> addProduct(Product product) async {
     final created = await ApiService.createProduct(product);
     _products.insert(0, created);
+    _productsVersion++;
     notifyListeners();
   }
 
@@ -313,6 +347,7 @@ class StoreProvider extends ChangeNotifier {
     if (index != -1) {
       _products[index] = updated;
     }
+    _productsVersion++;
     notifyListeners();
   }
 
@@ -320,6 +355,7 @@ class StoreProvider extends ChangeNotifier {
   Future<void> addCustomer(Customer customer) async {
     final created = await ApiService.createCustomer(customer);
     _customers.insert(0, created);
+    _customersVersion++;
     notifyListeners();
   }
 
@@ -329,6 +365,7 @@ class StoreProvider extends ChangeNotifier {
     if (index != -1) {
       _customers[index] = updated;
     }
+    _customersVersion++;
     notifyListeners();
   }
 
@@ -341,7 +378,95 @@ class StoreProvider extends ChangeNotifier {
     } else {
       _publishers.insert(0, saved);
     }
+    _publishersVersion++;
     notifyListeners();
+  }
+
+  // --- RETURNS / EXCHANGE ---
+  Future<ReturnRecord> submitReturn(ReturnRecord returnRecord) async {
+    final created = await ApiService.createReturn(returnRecord.toCreatePayload());
+    _returns.insert(0, created);
+    _returnsVersion++;
+
+    // Restock returned items
+    for (final item in returnRecord.returnedItems) {
+      final index = _products.indexWhere((p) => p.id == item.productId);
+      if (index != -1) {
+        final p = _products[index];
+        _products[index] = Product(
+          id: p.id,
+          name: p.name,
+          bengaliName: p.bengaliName,
+          category: p.category,
+          barcode: p.barcode,
+          sku: p.sku,
+          publisher: p.publisher,
+          bookClass: p.bookClass,
+          subject: p.subject,
+          itemType: p.itemType,
+          customCommissionRate: p.customCommissionRate,
+          editionYear: p.editionYear,
+          imageUrl: p.imageUrl,
+          buyPrice: p.buyPrice,
+          mrp: p.mrp,
+          stockQty: p.stockQty + item.quantity,
+          minStockAlert: p.minStockAlert,
+          unit: p.unit,
+        );
+      }
+    }
+
+    // Decrement stock for replacement items
+    for (final item in returnRecord.replacementItems) {
+      final index = _products.indexWhere((p) => p.id == item.productId);
+      if (index != -1) {
+        final p = _products[index];
+        _products[index] = Product(
+          id: p.id,
+          name: p.name,
+          bengaliName: p.bengaliName,
+          category: p.category,
+          barcode: p.barcode,
+          sku: p.sku,
+          publisher: p.publisher,
+          bookClass: p.bookClass,
+          subject: p.subject,
+          itemType: p.itemType,
+          customCommissionRate: p.customCommissionRate,
+          editionYear: p.editionYear,
+          imageUrl: p.imageUrl,
+          buyPrice: p.buyPrice,
+          mrp: p.mrp,
+          stockQty: (p.stockQty - item.quantity).clamp(0, 999999),
+          minStockAlert: p.minStockAlert,
+          unit: p.unit,
+        );
+      }
+    }
+    _productsVersion++;
+
+    // Reflect due adjustment locally if this return was tied to a real customer
+    if (returnRecord.customerId != null && returnRecord.customerId != 'walkin' && returnRecord.priceDifference != 0) {
+      final cIndex = _customers.indexWhere((c) => c.id == returnRecord.customerId);
+      if (cIndex != -1) {
+        final c = _customers[cIndex];
+        _customers[cIndex] = Customer(
+          id: c.id,
+          name: c.name,
+          phone: c.phone,
+          address: c.address,
+          type: c.type,
+          defaultCommissionRate: c.defaultCommissionRate,
+          totalPurchased: c.totalPurchased,
+          totalPaid: c.totalPaid,
+          currentDue: (c.currentDue + returnRecord.priceDifference).clamp(0.0, double.infinity),
+        );
+        _customersVersion++;
+      }
+    }
+
+    notifyListeners();
+    return created;
   }
 
   // Find product by barcode

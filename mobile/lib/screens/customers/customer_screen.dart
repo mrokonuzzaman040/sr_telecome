@@ -17,6 +17,8 @@ class CustomerScreen extends StatefulWidget {
 class _CustomerScreenState extends State<CustomerScreen> {
   final TextEditingController _searchController = TextEditingController();
   final currencyFormat = NumberFormat('#,##0', 'en_US');
+  String _typeFilter = 'all'; // 'all' | 'agent' | 'single'
+  bool _hasDueOnly = false;
 
   @override
   void dispose() {
@@ -125,11 +127,17 @@ class _CustomerScreenState extends State<CustomerScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final store = Provider.of<StoreProvider>(context);
+    // Rebuild only when customers actually change or loading flag flips, not
+    // on every StoreProvider notify (e.g. cart edits on the POS tab).
+    context.select<StoreProvider, int>((s) => s.customersVersion);
+    final isLoading = context.select<StoreProvider, bool>((s) => s.isLoading);
+    final store = context.read<StoreProvider>();
     final totalDue = store.customers.fold(0.0, (sum, c) => sum + c.currentDue);
 
     final query = _searchController.text.trim().toLowerCase();
     final filtered = store.customers.where((c) {
+      if (_typeFilter != 'all' && c.type != _typeFilter) return false;
+      if (_hasDueOnly && c.currentDue <= 0) return false;
       if (query.isEmpty) return true;
       return c.name.toLowerCase().contains(query) || c.phone.contains(query);
     }).toList();
@@ -221,13 +229,42 @@ class _CustomerScreenState extends State<CustomerScreen> {
             ),
           ),
 
+          // Filters: account type chips + has-due-only toggle
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            child: Row(
+              children: [
+                _buildTypeChip('all', 'সকল একাউন্ট'),
+                _buildTypeChip('agent', 'এজেন্ট'),
+                _buildTypeChip('single', 'খুচরা'),
+                const SizedBox(width: 4),
+                FilterChip(
+                  selected: _hasDueOnly,
+                  avatar: _hasDueOnly ? null : const Icon(Icons.filter_alt_outlined, size: 16),
+                  label: const Text('শুধু বাকি আছে'),
+                  selectedColor: AppTheme.danger.withValues(alpha: 0.12),
+                  checkmarkColor: AppTheme.danger,
+                  labelStyle: TextStyle(
+                    color: _hasDueOnly ? AppTheme.danger : Colors.black87,
+                    fontWeight: _hasDueOnly ? FontWeight.bold : FontWeight.normal,
+                  ),
+                  onSelected: (v) => setState(() => _hasDueOnly = v),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 8),
+
           // Customer List
           Expanded(
-            child: store.isLoading
+            child: isLoading
                 ? const Center(child: CircularProgressIndicator())
                 : filtered.isEmpty
                     ? const Center(child: Text('কোন কাস্টমার মেলেনি', style: TextStyle(color: Colors.grey)))
-                    : ListView.builder(
+                    : RefreshIndicator(
+                      onRefresh: store.loadAllData,
+                      child: ListView.builder(
                         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                         itemCount: filtered.length,
                         itemBuilder: (ctx, index) {
@@ -342,8 +379,27 @@ class _CustomerScreenState extends State<CustomerScreen> {
                           );
                         },
                       ),
+                    ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildTypeChip(String key, String label) {
+    final isSelected = _typeFilter == key;
+    return Padding(
+      padding: const EdgeInsets.only(right: 8),
+      child: FilterChip(
+        selected: isSelected,
+        label: Text(label),
+        selectedColor: AppTheme.primary.withValues(alpha: 0.15),
+        checkmarkColor: AppTheme.primary,
+        labelStyle: TextStyle(
+          color: isSelected ? AppTheme.primary : Colors.black87,
+          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+        ),
+        onSelected: (_) => setState(() => _typeFilter = key),
       ),
     );
   }

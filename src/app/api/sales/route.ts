@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { query, pool } from "@/lib/db";
 import { SaleItem } from "@/types";
 import { verifyAuth } from "@/lib/auth";
+import { sendSalePushNotification } from "@/lib/fcm";
 
 export async function GET(req: NextRequest) {
   try {
@@ -118,7 +119,46 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // 4. Log to persistent notifications table
+    try {
+      const notifId = `notif-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
+      const notifTitle = `নতুন বিক্রয় সম্পন্ন (#${invoiceNo})`;
+      const notifMessage = `${body.customerName ? `${body.customerName} - ` : ""}মোট ৳${(Number(body.payableAmount) || 0).toLocaleString()} পরিশোধ: ৳${Number(body.paidAmount) || 0}${Number(body.dueAmount) > 0 ? ` | বাকি: ৳${Number(body.dueAmount)}` : ""}`;
+      
+      await client.query(
+        `INSERT INTO notifications (id, type, title, message, metadata, created_at)
+         VALUES ($1, $2, $3, $4, $5, NOW())`,
+        [
+          notifId,
+          "sale",
+          notifTitle,
+          notifMessage,
+          JSON.stringify({
+            saleId: id,
+            invoiceNo,
+            amount: Number(body.payableAmount) || 0,
+            customerName: body.customerName,
+          }),
+        ]
+      );
+    } catch (notifErr) {
+      console.warn("Could not insert sale notification log:", notifErr);
+    }
+
     await client.query("COMMIT");
+
+    // 5. Asynchronously broadcast push notification to all registered Android mobile devices
+    sendSalePushNotification({
+      invoiceNo,
+      payableAmount: Number(body.payableAmount) || 0,
+      paidAmount: Number(body.paidAmount) || 0,
+      dueAmount: Number(body.dueAmount) || 0,
+      customerName: body.customerName,
+      itemCount: Array.isArray(body.items) ? body.items.length : 1,
+    }).catch((pushErr) => {
+      console.warn("FCM push broadcast non-blocking error:", pushErr);
+    });
+
     return NextResponse.json({ success: true, sale: insertRes.rows[0] });
   } catch (err: any) {
     await client.query("ROLLBACK");

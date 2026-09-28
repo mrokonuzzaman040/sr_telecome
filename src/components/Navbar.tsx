@@ -29,6 +29,7 @@ import {
   Receipt,
   Settings,
 } from "lucide-react";
+import { NotificationCenter } from "@/components/NotificationCenter";
 
 interface TopHeaderProps {
   activeTab: DashboardTab;
@@ -329,6 +330,9 @@ export function Navbar({
               <span>{lowStockCount}</span>
             </div>
           )}
+
+          {/* Real-time Notification Center & Sound Alerts Popover */}
+          <NotificationCenter />
 
           {/* Full Screen Mode Toggle Button (Icon only) */}
           <button

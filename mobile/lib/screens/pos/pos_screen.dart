@@ -65,7 +65,13 @@ class _PosScreenState extends State<PosScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final store = Provider.of<StoreProvider>(context);
+    // This screen only renders the product catalog + cart summary, so it only
+    // needs to rebuild when products/loading/cart actually change - not on
+    // every StoreProvider notify from other tabs (e.g. a customer edit).
+    context.select<StoreProvider, int>((s) => s.productsVersion);
+    context.select<StoreProvider, int>((s) => s.cartTotalQuantity);
+    final isLoading = context.select<StoreProvider, bool>((s) => s.isLoading);
+    final store = context.read<StoreProvider>();
 
     // Filter products
     final query = _searchController.text.trim().toLowerCase();
@@ -147,7 +153,7 @@ class _PosScreenState extends State<PosScreen> {
 
           // Products List / Grid
           Expanded(
-            child: store.isLoading
+            child: isLoading
                 ? const Center(child: CircularProgressIndicator())
                 : filtered.isEmpty
                     ? Center(
@@ -168,7 +174,9 @@ class _PosScreenState extends State<PosScreen> {
                           ],
                         ),
                       )
-                    : ListView.builder(
+                    : RefreshIndicator(
+                      onRefresh: store.loadAllData,
+                      child: ListView.builder(
                         padding: const EdgeInsets.only(left: 12, right: 12, top: 4, bottom: 80),
                         itemCount: filtered.length,
                         itemBuilder: (ctx, index) {
@@ -256,6 +264,7 @@ class _PosScreenState extends State<PosScreen> {
                           );
                         },
                       ),
+                    ),
           ),
         ],
       ),

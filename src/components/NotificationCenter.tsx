@@ -17,7 +17,7 @@ import {
   Sparkles,
   Info,
 } from "lucide-react";
-import { NotificationType } from "@/types";
+import { NotificationType, StoreNotification } from "@/types";
 
 export function NotificationCenter() {
   const {
@@ -52,7 +52,7 @@ export function NotificationCenter() {
     };
   }, [isOpen]);
 
-  const filteredNotifications = notifications.filter((n) => {
+  const filteredNotifications = notifications.filter((n: StoreNotification) => {
     if (filter === "all") return true;
     return n.type === filter;
   });
@@ -249,7 +249,7 @@ export function NotificationCenter() {
                 </button>
               </div>
             ) : (
-              filteredNotifications.map((notif) => (
+              filteredNotifications.map((notif: StoreNotification) => (
                 <div
                   key={notif.id}
                   onClick={() => markNotificationAsRead(notif.id)}

@@ -17,6 +17,9 @@ class InventoryScreen extends StatefulWidget {
 class _InventoryScreenState extends State<InventoryScreen> {
   final TextEditingController _searchController = TextEditingController();
   bool _showOnlyLowStock = false;
+  String _categoryFilter = 'all'; // 'all' | 'book' | 'stationery'
+  String _publisherFilter = 'all';
+  String _classFilter = 'all';
   final currencyFormat = NumberFormat('#,##0', 'en_US');
 
   @override
@@ -25,15 +28,46 @@ class _InventoryScreenState extends State<InventoryScreen> {
     super.dispose();
   }
 
+  bool get _hasActiveFilters =>
+      _showOnlyLowStock || _categoryFilter != 'all' || _publisherFilter != 'all' || _classFilter != 'all';
+
+  void _clearFilters() {
+    setState(() {
+      _showOnlyLowStock = false;
+      _categoryFilter = 'all';
+      _publisherFilter = 'all';
+      _classFilter = 'all';
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
-    final store = Provider.of<StoreProvider>(context);
+    // Rebuild only when the products list or loading flag actually changes,
+    // not on every StoreProvider notify (e.g. cart edits on the POS tab).
+    context.select<StoreProvider, int>((s) => s.productsVersion);
+    final isLoading = context.select<StoreProvider, bool>((s) => s.isLoading);
+    final store = context.read<StoreProvider>();
+    final products = store.products;
     final auth = Provider.of<AuthProvider>(context);
     final isAdmin = auth.isAdmin;
 
+    final publishers = <String>{
+      for (final p in products)
+        if (p.publisher != null && p.publisher!.trim().isNotEmpty) p.publisher!.trim(),
+    }.toList()
+      ..sort();
+    final classes = <String>{
+      for (final p in products)
+        if (p.bookClass != null && p.bookClass!.trim().isNotEmpty) p.bookClass!.trim(),
+    }.toList()
+      ..sort();
+
     final query = _searchController.text.trim().toLowerCase();
-    final filtered = store.products.where((p) {
+    final filtered = products.where((p) {
       if (_showOnlyLowStock && !p.isLowStock) return false;
+      if (_categoryFilter != 'all' && p.category != _categoryFilter) return false;
+      if (_publisherFilter != 'all' && p.publisher != _publisherFilter) return false;
+      if (_classFilter != 'all' && p.bookClass != _classFilter) return false;
       if (query.isEmpty) return true;
       return p.name.toLowerCase().contains(query) ||
           (p.bengaliName?.toLowerCase().contains(query) == true) ||
@@ -42,7 +76,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
           (p.bookClass?.toLowerCase().contains(query) == true);
     }).toList();
 
-    final lowStockCount = store.products.where((p) => p.isLowStock).length;
+    final lowStockCount = products.where((p) => p.isLowStock).length;
 
     return Scaffold(
       appBar: AppBar(
@@ -159,13 +193,63 @@ class _InventoryScreenState extends State<InventoryScreen> {
             ),
           ),
 
+          // Filters: category chips + publisher/class dropdowns
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            child: Row(
+              children: [
+                _buildCategoryChip('all', 'সকল পণ্য'),
+                _buildCategoryChip('book', 'বই'),
+                _buildCategoryChip('stationery', 'স্টেশনারী'),
+                const SizedBox(width: 4),
+                _buildDropdownFilter(
+                  value: _publisherFilter,
+                  hint: 'প্রকাশনী',
+                  options: publishers,
+                  onChanged: (v) => setState(() => _publisherFilter = v),
+                ),
+                const SizedBox(width: 8),
+                _buildDropdownFilter(
+                  value: _classFilter,
+                  hint: 'শ্রেণী',
+                  options: classes,
+                  onChanged: (v) => setState(() => _classFilter = v),
+                ),
+                if (_hasActiveFilters) ...[
+                  const SizedBox(width: 8),
+                  ActionChip(
+                    avatar: const Icon(Icons.filter_alt_off, size: 16, color: AppTheme.danger),
+                    label: const Text('ফিল্টার মুছুন', style: TextStyle(color: AppTheme.danger)),
+                    onPressed: _clearFilters,
+                  ),
+                ],
+                const SizedBox(width: 4),
+              ],
+            ),
+          ),
+          const SizedBox(height: 8),
+
           // Product List
           Expanded(
-            child: store.isLoading
+            child: isLoading
                 ? const Center(child: CircularProgressIndicator())
                 : filtered.isEmpty
-                    ? const Center(child: Text('কোন পণ্য মেলেনি', style: TextStyle(color: Colors.grey)))
-                    : ListView.builder(
+                    ? Center(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.search_off, size: 48, color: Colors.grey),
+                            const SizedBox(height: 8),
+                            const Text('কোন পণ্য মেলেনি', style: TextStyle(color: Colors.grey)),
+                            if (_hasActiveFilters)
+                              TextButton(onPressed: _clearFilters, child: const Text('ফিল্টার মুছুন')),
+                          ],
+                        ),
+                      )
+                    : RefreshIndicator(
+                      onRefresh: store.loadAllData,
+                      child: ListView.builder(
                         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                         itemCount: filtered.length,
                         itemBuilder: (ctx, index) {
@@ -242,8 +326,63 @@ class _InventoryScreenState extends State<InventoryScreen> {
                           );
                         },
                       ),
+                    ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildCategoryChip(String key, String label) {
+    final isSelected = _categoryFilter == key;
+    return Padding(
+      padding: const EdgeInsets.only(right: 8),
+      child: FilterChip(
+        selected: isSelected,
+        label: Text(label),
+        selectedColor: AppTheme.primary.withValues(alpha: 0.15),
+        checkmarkColor: AppTheme.primary,
+        labelStyle: TextStyle(
+          color: isSelected ? AppTheme.primary : Colors.black87,
+          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+        ),
+        onSelected: (_) => setState(() => _categoryFilter = key),
+      ),
+    );
+  }
+
+  Widget _buildDropdownFilter({
+    required String value,
+    required String hint,
+    required List<String> options,
+    required ValueChanged<String> onChanged,
+  }) {
+    final isActive = value != 'all';
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10),
+      decoration: BoxDecoration(
+        color: isActive ? AppTheme.primary.withValues(alpha: 0.1) : Colors.grey.shade100,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: isActive ? AppTheme.primary : Colors.grey.shade300),
+      ),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<String>(
+          value: value,
+          isDense: true,
+          icon: const Icon(Icons.arrow_drop_down, size: 18),
+          style: TextStyle(
+            fontSize: 13,
+            color: isActive ? AppTheme.primary : Colors.black87,
+            fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
+          ),
+          items: [
+            DropdownMenuItem(value: 'all', child: Text('সকল $hint')),
+            ...options.map((o) => DropdownMenuItem(value: o, child: Text(o))),
+          ],
+          onChanged: (v) {
+            if (v != null) onChanged(v);
+          },
+        ),
       ),
     );
   }

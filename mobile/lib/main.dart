@@ -5,6 +5,7 @@ import 'providers/store_provider.dart';
 import 'screens/login_screen.dart';
 import 'screens/home_screen.dart';
 import 'theme/app_theme.dart';
+import 'widgets/loading_screen.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -28,9 +29,7 @@ class SRTelecomApp extends StatelessWidget {
             debugShowCheckedModeBanner: false,
             theme: AppTheme.lightTheme,
             home: auth.isLoading
-                ? const Scaffold(
-                    body: Center(child: CircularProgressIndicator()),
-                  )
+                ? const LoadingScreen()
                 : auth.isAuthenticated
                     ? const HomeScreen()
                     : const LoginScreen(),

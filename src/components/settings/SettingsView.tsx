@@ -14,6 +14,11 @@ import {
   ShieldCheck,
   KeyRound,
   Lock,
+  Bell,
+  Volume2,
+  VolumeX,
+  Smartphone,
+  Sparkles,
 } from "lucide-react";
 
 export function SettingsView() {
@@ -27,6 +32,11 @@ export function SettingsView() {
     createDailyBackup,
     loadDailyBackups,
     updateUserPin,
+    soundEnabled,
+    setSoundEnabled,
+    desktopNotificationsEnabled,
+    requestDesktopNotificationPermission,
+    testSaleNotification,
     showAlert,
     showConfirm,
   } = useStore();
@@ -543,6 +553,100 @@ export function SettingsView() {
               {isChangingCashierPin ? "Updating..." : "Update Cashier PIN"}
             </button>
           </form>
+        </div>
+      </div>
+
+      {/* Real-time Notifications & Sound Alerts Settings */}
+      <div className="bg-white rounded-lg border border-slate-200 shadow-2xs p-4 space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-b border-slate-200 pb-3">
+          <div>
+            <h3 className="font-bold text-xs uppercase tracking-wider text-slate-800 flex items-center gap-1.5">
+              <Bell className="w-4 h-4 text-emerald-600" />
+              <span>Real-Time Notifications &amp; Sound Alerts (বিক্রয় নোটিফিকেশন ও সাউন্ড)</span>
+            </h3>
+            <p className="text-[11px] text-slate-500 mt-0.5">
+              প্রতিটি বিক্রয় সম্পন্ন হলে ক্যাশ রেজিস্টার সাউন্ড চাইম, ব্রাউজার নোটিফিকেশন এবং অ্যান্ড্রয়েড পুশ নোটিফিকেশন
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={testSaleNotification}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold shadow-2xs transition shrink-0 cursor-pointer"
+          >
+            <Sparkles className="w-3.5 h-3.5" />
+            <span>Test Chime &amp; Notification</span>
+          </button>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+          {/* Sound Synthesizer Setting */}
+          <div className="p-3 rounded-lg border border-slate-200 bg-slate-50/60 flex items-start justify-between gap-3">
+            <div className="space-y-1">
+              <div className="flex items-center gap-1.5 font-bold text-slate-900">
+                {soundEnabled ? (
+                  <Volume2 className="w-4 h-4 text-emerald-600" />
+                ) : (
+                  <VolumeX className="w-4 h-4 text-slate-400" />
+                )}
+                <span>Cash Register Audio Chime</span>
+              </div>
+              <p className="text-[11px] text-slate-500">
+                বিক্রয় রশিদ তৈরির সাথে সাথে ক্যাশ রেজিস্টার বেল বাজবে (Web Audio API - 100% অফলাইন ও দ্রুত)।
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setSoundEnabled(!soundEnabled)}
+              className={`px-3 py-1 rounded-full font-bold text-[11px] transition shrink-0 cursor-pointer ${
+                soundEnabled
+                  ? "bg-emerald-600 text-white"
+                  : "bg-slate-200 text-slate-600 hover:bg-slate-300"
+              }`}
+            >
+              {soundEnabled ? "চালু (ON)" : "বন্ধ (OFF)"}
+            </button>
+          </div>
+
+          {/* Desktop Push Notification Setting */}
+          <div className="p-3 rounded-lg border border-slate-200 bg-slate-50/60 flex items-start justify-between gap-3">
+            <div className="space-y-1">
+              <div className="flex items-center gap-1.5 font-bold text-slate-900">
+                <Bell className="w-4 h-4 text-indigo-600" />
+                <span>Browser Push Notifications</span>
+              </div>
+              <p className="text-[11px] text-slate-500">
+                ট্যাব ব্যাকগ্রাউন্ডে থাকলেও বা মিনিমাইজ করা থাকলেও কম্পিউটার স্ক্রিনে তাৎক্ষণিক বিক্রয় নোটিফিকেশন আসবে।
+              </p>
+            </div>
+
+            {desktopNotificationsEnabled ? (
+              <span className="px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-800 font-bold text-[11px] shrink-0">
+                অনুমোদিত ✓
+              </span>
+            ) : (
+              <button
+                type="button"
+                onClick={requestDesktopNotificationPermission}
+                className="px-3 py-1 rounded-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-[11px] transition shrink-0 cursor-pointer"
+              >
+                অনুমতি দিন
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Android Push Notification Info Banner */}
+        <div className="p-3 rounded-lg border border-blue-200 bg-blue-50/50 flex items-start gap-2.5 text-xs text-blue-900">
+          <Smartphone className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
+          <div className="space-y-0.5 leading-relaxed">
+            <span className="font-bold text-blue-950">অ্যান্ড্রয়েড মোবাইল পুশ নোটিফিকেশন (FCM):</span>
+            <p className="text-[11px] text-blue-800">
+              অ্যান্ড্রয়েড মোবাইল অ্যাপ চালু থাকলে বা ব্যাকগ্রাউন্ডে থাকলেও যেকোনো বিক্রয় সম্পন্ন হওয়ার সাথে সাথে পুশ নোটিফিকেশন পাঠাতে সার্ভার প্রস্তুত। 
+              মোবাইল অ্যাপ লগইন করলেই স্বয়ংক্রিয়ভাবে ব্যাকএন্ডের <code className="bg-blue-100 px-1 rounded font-mono text-[10px]">/api/notifications/register-token</code> এন্ডপয়েন্টে ডিভাইস টোকেন যুক্ত হয়ে যায়।
+            </p>
+          </div>
         </div>
       </div>
 

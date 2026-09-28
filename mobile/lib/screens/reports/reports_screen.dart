@@ -6,6 +6,7 @@ import '../../providers/auth_provider.dart';
 import '../../models/expense.dart';
 import '../../theme/app_theme.dart';
 import '../invoices/invoices_list_screen.dart';
+import '../returns/returns_screen.dart';
 
 const Map<String, String> kExpenseCategoryLabels = {
   'rent': 'ভাড়া',
@@ -241,6 +242,14 @@ class _ReportsScreenState extends State<ReportsScreen> {
             onPressed: () => Navigator.push(
               context,
               MaterialPageRoute(builder: (_) => const InvoicesListScreen()),
+            ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.assignment_return_outlined),
+            tooltip: 'রিটার্ন ও এক্সচেঞ্জ',
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const ReturnsScreen()),
             ),
           ),
           IconButton(

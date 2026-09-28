@@ -6,6 +6,7 @@ import '../models/customer.dart';
 import '../models/sale.dart';
 import '../models/expense.dart';
 import '../models/publisher.dart';
+import '../models/return_record.dart';
 import '../models/user.dart';
 
 class ApiService {
@@ -287,6 +288,113 @@ class ApiService {
       return Publisher.fromJson(decoded['publisher'] as Map<String, dynamic>);
     } else {
       throw Exception('Failed to save publisher: ${_extractError(res)}');
+    }
+  }
+
+  // --- RETURNS / EXCHANGE ---
+  static Future<List<ReturnRecord>> fetchReturns() async {
+    final url = Uri.parse('$baseUrl/api/returns');
+    final res = await http.get(url, headers: await _authHeaders()).timeout(const Duration(seconds: 10));
+
+    if (res.statusCode == 200) {
+      final List data = jsonDecode(res.body);
+      return data.map((json) => ReturnRecord.fromJson(json)).toList();
+    } else {
+      throw Exception('Failed to load returns: ${_extractError(res)}');
+    }
+  }
+
+  static Future<ReturnRecord> createReturn(Map<String, dynamic> payload) async {
+    final url = Uri.parse('$baseUrl/api/returns');
+    final res = await http.post(
+      url,
+      headers: await _authHeaders(),
+      body: jsonEncode(payload),
+    );
+
+    if (res.statusCode == 200 || res.statusCode == 201) {
+      final decoded = jsonDecode(res.body);
+      return ReturnRecord.fromJson(decoded['returnRecord'] as Map<String, dynamic>);
+    } else {
+      throw Exception('Failed to save return: ${_extractError(res)}');
+    }
+  }
+
+  // --- BACKUPS (admin only) ---
+  static Future<List<Map<String, dynamic>>> fetchBackups() async {
+    final url = Uri.parse('$baseUrl/api/backups');
+    final res = await http.get(url, headers: await _authHeaders()).timeout(const Duration(seconds: 10));
+
+    if (res.statusCode == 200) {
+      final List data = jsonDecode(res.body);
+      return data.cast<Map<String, dynamic>>();
+    } else {
+      throw Exception('Failed to load backups: ${_extractError(res)}');
+    }
+  }
+
+  static Future<Map<String, dynamic>> triggerBackup() async {
+    final url = Uri.parse('$baseUrl/api/backups');
+    final res = await http.post(
+      url,
+      headers: await _authHeaders(),
+      body: jsonEncode({'backupType': 'manual'}),
+    );
+
+    if (res.statusCode == 200) {
+      return jsonDecode(res.body) as Map<String, dynamic>;
+    } else {
+      throw Exception('Failed to create backup: ${_extractError(res)}');
+    }
+  }
+
+  // --- NOTIFICATIONS & FCM DEVICE TOKENS ---
+  static Future<bool> registerDeviceToken({
+    required String token,
+    String? deviceName,
+    String platform = 'android',
+  }) async {
+    try {
+      final url = Uri.parse('$baseUrl/api/notifications/register-token');
+      final res = await http.post(
+        url,
+        headers: await _authHeaders(),
+        body: jsonEncode({
+          'token': token,
+          'deviceName': deviceName ?? 'Android Device',
+          'platform': platform,
+        }),
+      );
+      return res.statusCode == 200;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  static Future<List<Map<String, dynamic>>> fetchNotifications() async {
+    try {
+      final url = Uri.parse('$baseUrl/api/notifications');
+      final res = await http.get(url, headers: await _authHeaders()).timeout(const Duration(seconds: 10));
+
+      if (res.statusCode == 200) {
+        final List data = jsonDecode(res.body);
+        return data.cast<Map<String, dynamic>>();
+      }
+    } catch (_) {}
+    return [];
+  }
+
+  static Future<bool> markNotificationsRead({String? id, bool all = false}) async {
+    try {
+      final url = Uri.parse('$baseUrl/api/notifications');
+      final res = await http.patch(
+        url,
+        headers: await _authHeaders(),
+        body: jsonEncode({'id': id, 'all': all}),
+      );
+      return res.statusCode == 200;
+    } catch (_) {
+      return false;
     }
   }
 }

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../theme/app_theme.dart';
+import 'printer_settings_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -53,11 +54,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
               title: const Text('থার্মাল প্রিন্টার (Bluetooth POS)'),
               subtitle: const Text('৫৮মিমি / ৮০মিমি ব্লুটুথ থার্মাল রিসিট প্রিন্টার'),
               trailing: const Icon(Icons.chevron_right),
-              onTap: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('ব্লুটুথ স্ক্যানিং শীঘ্রই সংযুক্ত হচ্ছে')),
-                );
-              },
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const PrinterSettingsScreen()),
+              ),
             ),
           ),
           const SizedBox(height: 10),

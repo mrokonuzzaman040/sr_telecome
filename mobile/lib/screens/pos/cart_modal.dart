@@ -3,6 +3,8 @@ import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import '../../providers/store_provider.dart';
 import '../../models/customer.dart';
+import '../../models/sale.dart';
+import '../../services/printer_service.dart';
 import '../../theme/app_theme.dart';
 
 class CartModal extends StatefulWidget {
@@ -74,9 +76,7 @@ class _CartModalState extends State<CartModal> {
               label: const Text('রিসিপ্ট প্রিন্ট'),
               onPressed: () {
                 Navigator.pop(ctx);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('ব্লুটুথ প্রিন্টারে রিসিপ্ট পাঠানো হচ্ছে...')),
-                );
+                _printReceipt(sale);
               },
             ),
           ],
@@ -91,6 +91,20 @@ class _CartModalState extends State<CartModal> {
     } finally {
       if (mounted) setState(() => _isProcessing = false);
     }
+  }
+
+  Future<void> _printReceipt(Sale sale) async {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('প্রিন্টারে রিসিপ্ট পাঠানো হচ্ছে...')),
+    );
+    final ok = await PrinterService.printSaleReceipt(sale);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(ok ? 'রিসিপ্ট প্রিন্ট হয়েছে' : 'প্রিন্টার সংযুক্ত নেই। সেটিংস থেকে প্রিন্টার সংযুক্ত করুন।'),
+        backgroundColor: ok ? AppTheme.success : AppTheme.danger,
+      ),
+    );
   }
 
   @override

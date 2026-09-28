@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import '../../providers/store_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../models/sale.dart';
+import '../../services/printer_service.dart';
 import '../../theme/app_theme.dart';
 
 const Map<String, String> kPaymentMethodLabels = {
@@ -134,6 +135,27 @@ class _InvoicesListScreenState extends State<InvoicesListScreen> {
                     Text('পেমেন্ট মাধ্যম: ${kPaymentMethodLabels[sale.paymentMethod] ?? sale.paymentMethod}',
                         style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
                   ],
+                ),
+              ),
+              const SizedBox(height: 12),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: () async {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('প্রিন্টারে রিসিপ্ট পাঠানো হচ্ছে...')),
+                    );
+                    final ok = await PrinterService.printSaleReceipt(sale);
+                    if (!mounted) return;
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(ok ? 'রিসিপ্ট প্রিন্ট হয়েছে' : 'প্রিন্টার সংযুক্ত নেই। সেটিংস থেকে প্রিন্টার সংযুক্ত করুন।'),
+                        backgroundColor: ok ? AppTheme.success : AppTheme.danger,
+                      ),
+                    );
+                  },
+                  icon: const Icon(Icons.print_outlined),
+                  label: const Text('রিসিপ্ট রিপ্রিন্ট করুন'),
                 ),
               ),
               const SizedBox(height: 24),

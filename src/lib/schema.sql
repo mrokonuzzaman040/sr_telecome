@@ -200,3 +200,25 @@ CREATE TABLE IF NOT EXISTS daily_backups (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
+-- 11. Mobile FCM Device Push Tokens (Android & Mobile)
+CREATE TABLE IF NOT EXISTS device_tokens (
+    id VARCHAR(64) PRIMARY KEY,
+    user_id VARCHAR(64),
+    token TEXT UNIQUE NOT NULL,
+    device_name VARCHAR(150),
+    platform VARCHAR(30) DEFAULT 'android',
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 12. Persistent Notification Log
+CREATE TABLE IF NOT EXISTS notifications (
+    id VARCHAR(64) PRIMARY KEY,
+    type VARCHAR(30) NOT NULL, -- 'sale' | 'low_stock' | 'due' | 'system'
+    title VARCHAR(255) NOT NULL,
+    message TEXT NOT NULL,
+    metadata JSONB,
+    is_read BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
