@@ -10,9 +10,9 @@ import { checkRateLimit, getClientIp } from "@/lib/rateLimit";
  */
 export async function GET(req: NextRequest) {
   try {
-    // Moderate rate limiting for combined sync endpoint with Redis
+    // Increased rate limiting for combined sync endpoint (was 15, now 60)
     const ip = getClientIp(req);
-    const rateLimitResult = await checkRateLimit(`sync:${ip}`, 15, 60); // 15 requests per minute with Redis
+    const rateLimitResult = await checkRateLimit(`sync:${ip}`, 60, 60); // 60 requests per minute with Redis
     
     if (!rateLimitResult.allowed) {
       return NextResponse.json(

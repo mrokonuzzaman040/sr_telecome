@@ -5,9 +5,9 @@ import { checkRateLimit, getClientIp } from "@/lib/rateLimit";
 
 export async function GET(req: NextRequest) {
   try {
-    // Very strict rate limiting for Supabase pooler limits
+    // Increased rate limiting for mobile app (was 20, now 100)
     const ip = getClientIp(req);
-    const rateLimitResult = await checkRateLimit(`expenses:${ip}`, 20, 60); // 20 requests per minute with Redis
+    const rateLimitResult = await checkRateLimit(`expenses:${ip}`, 100, 60); // 100 requests per minute with Redis
     
     if (!rateLimitResult.allowed) {
       return NextResponse.json(
